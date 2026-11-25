@@ -37,6 +37,7 @@ struct AppDetailView: View {
         let avgSession = Fmt.duration(insights.averageSession), longestSession = Fmt.duration(insights.longestSession)
         return OScroll {
             VStack(alignment: .leading, spacing: 0) {
+                UsageNav()
                 header(s, index: index, info: info, id: usage.bundleID)
 
                 HStack(alignment: .top, spacing: 48) {

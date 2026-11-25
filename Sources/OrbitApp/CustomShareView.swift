@@ -9,6 +9,7 @@ struct ShareHubView: View {
     @State private var toast: String?
     @State private var bgTab = 0   // 0 built-in, 1 my picture, 2 solid
     @State private var tab: InspectorTab = .content
+    @StateObject private var shareAnchor = ShareAnchor()
 
     /// The inspector is split in two pages so it fits without a long scroll.
     enum InspectorTab: String, CaseIterable { case content = "内容", style = "样式" }
@@ -50,7 +51,13 @@ struct ShareHubView: View {
         return s
     }
 
-    private var canExport: Bool { mode == .usage ? !usageData.isEmpty : custom.totalApps > 0 }
+    private var canExport: Bool {
+        switch mode {
+        case .usage: !usageData.isEmpty
+        case .picked: custom.totalApps > 0
+        case .gear: model.macProfile != nil
+        }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -71,6 +78,7 @@ struct ShareHubView: View {
         }
         .sheet(isPresented: $showPicker) { AppPickerSheet(custom: custom).environmentObject(model) }
         .task {
+            await model.loadMacFacts()
             await custom.loadInstalledIfNeeded()
             custom.seedIfNeeded(scores: model.recencyScores())
         }
@@ -81,6 +89,7 @@ struct ShareHubView: View {
         HStack(spacing: 16) {
             Text(captionText).font(.system(size: 11)).foregroundStyle(Theme.text2).lineLimit(1)
             Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
+            Button("分享…") { shareWithSystem() }.glassButton().disabled(!canExport).background(ShareAnchorView(anchor: shareAnchor))
             Button { copy() } label: {
                 HStack(spacing: 8) { Text("拷贝图片"); Text("⌘C").font(.system(size: 12)).opacity(0.7) }
             }
@@ -95,6 +104,7 @@ struct ShareHubView: View {
             let style = usageStyle
             return "\(model.periodTitle) · \(style.template == .bubbles ? "\(style.bubbleCount) 个应用" : "Top \(style.topN)") · \(style.template.ratio)"
         }
+        if mode == .gear { return model.macProfile == nil ? "" : "我的装备 · \(custom.doc.ratio.label)" }
         guard custom.totalApps > 0 else { return "" }
         return "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件 · \(custom.doc.ratio.label)"
     }
@@ -127,7 +137,10 @@ struct ShareHubView: View {
             let size = custom.doc.ratio.size
             let s = min((geo.size.width - 80) / size.width, (geo.size.height - 40) / size.height, 1)
             ZStack {
-                if custom.totalApps == 0 {
+                if mode == .gear && model.macProfile == nil {
+                    Text("正在读取这台 Mac 的信息…").font(.system(size: 13)).foregroundStyle(Theme.text2)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else if mode == .picked && custom.totalApps == 0 {
                     VStack(spacing: 14) {
                         GlassIcon(index: GI.layout, size: 84)
                         Text("还没有选择软件").font(.system(size: 18, weight: .bold))
@@ -139,7 +152,7 @@ struct ShareHubView: View {
                     .padding(.horizontal, 40)
                     .frame(width: geo.size.width, height: geo.size.height)
                 } else {
-                    CustomShareCardView(doc: custom.doc, groups: groups)
+                    CustomShareCardView(doc: custom.doc, groups: mode == .gear ? [] : groups, gear: mode == .gear ? model.macProfile : nil)
                         .scaleEffect(s)
                         .frame(width: size.width * s, height: size.height * s)
                         .clipShape(RoundedRectangle(cornerRadius: custom.doc.cornerRadius * s, style: .continuous))
@@ -175,20 +188,24 @@ struct ShareHubView: View {
     private var contentPage: some View {
         group("内容来源") {
             GlassSegmented(options: ShareMode.allCases, label: \.rawValue, selection: $custom.doc.mode, fill: true)
-            Text(mode == .usage ? "用真实的使用时长生成排行、年度报告。" : "自己挑选想展示的软件，分组后生成分享图。")
+            Text(mode == .usage ? "用真实的使用时长生成排行、年度报告。" : mode == .picked ? "自己挑选想展示的软件，分组后生成分享图。" : "把这台 Mac 的机型、芯片、内存等做成一张图。不含序列号。")
                 .font(.system(size: 11)).foregroundStyle(Theme.text2)
         }
-        if mode == .usage { usageContentSections } else { pickedContentSections }
+        switch mode {
+        case .usage: usageContentSections
+        case .picked: pickedContentSections
+        case .gear: gearContentSections
+        }
     }
 
     @ViewBuilder
     private var stylePage: some View {
-        if mode == .usage { usageLayoutSection } else { pickedLayoutSection }
+        if mode == .usage { usageLayoutSection } else { pickedLayoutSection }   // gear shares the picked templates (background and ink)
         group("背景") {
             GlassSegmented(options: [0, 1, 2], label: { ["内置", "我的图片", "纯色"][$0] }, selection: $bgTab, fill: true)
             backgroundPicker
             if custom.doc.background.hasPrefix("builtin:") || custom.doc.background.hasPrefix("custom:")
-                || (mode == .picked && custom.doc.background == "default" && custom.doc.template == .fjord) {
+                || (mode != .usage && custom.doc.background == "default" && custom.doc.template == .fjord) {
                 row("遮罩强度") { Text("\(Int(custom.doc.overlay * 100))%").foregroundStyle(Theme.text2) }
                 Slider(value: $custom.doc.overlay, in: 0...1)
                 row("背景模糊") { Text("\(Int(custom.doc.blur))").foregroundStyle(Theme.text2) }
@@ -208,15 +225,15 @@ struct ShareHubView: View {
             }
         }
         group("外观") {
-            if mode == .picked {
+            if mode != .usage {
                 row("比例") { GlassSegmented(options: CanvasRatio.allCases, label: \.rawValue, selection: $custom.doc.ratio) }
             }
             row("圆角") { Text("\(Int(custom.doc.cornerRadius)) pt").foregroundStyle(Theme.text2).monospacedDigit() }
             Slider(value: $custom.doc.cornerRadius, in: 0...56, step: 2)
-            if mode == .picked {
-                row("图标大小") { GlassSegmented(options: IconSize.allCases, label: \.rawValue, selection: $custom.doc.iconSize) }
+            if mode != .usage {
+                if mode == .picked { row("图标大小") { GlassSegmented(options: IconSize.allCases, label: \.rawValue, selection: $custom.doc.iconSize) } }
                 row("标题字体") { GlassSegmented(options: TitleFont.allCases, label: \.rawValue, selection: $custom.doc.titleFont) }
-                row("显示软件名称") { GlassToggle(isOn: $custom.doc.showNames) }
+                if mode == .picked { row("显示软件名称") { GlassToggle(isOn: $custom.doc.showNames) } }
             } else if model.dataStyle.template == .bubbles {
                 row("图标间距") { Text("\(Int(model.dataStyle.bubbleSpacing))%").foregroundStyle(Theme.text2).monospacedDigit() }
                 Slider(value: $model.dataStyle.bubbleSpacing, in: 0...30, step: 1)
@@ -285,6 +302,28 @@ struct ShareHubView: View {
     }
 
     @ViewBuilder
+    private var gearContentSections: some View {
+        group("文案") {
+            field("标题（留空显示机型）") { TextField(model.macProfile?.modelName ?? "机型", text: $custom.doc.gearTitle) }
+            field("文案（可留空，可换行）") { TextField("一句话", text: $custom.doc.gearCaption, axis: .vertical).lineLimit(1...3) }
+            field("署名") { TextField("署名", text: $custom.doc.signature) }
+        }
+        group("显示内容") {
+            ForEach([("chip", "芯片"), ("memory", "内存"), ("storage", "存储"), ("system", "系统版本"), ("model", "机型标识")], id: \.0) { key, name in
+                row(name) {
+                    GlassToggle(isOn: Binding(
+                        get: { custom.doc.gearItems.contains(key) },
+                        set: { on in
+                            if on { if !custom.doc.gearItems.contains(key) { custom.doc.gearItems.append(key) } }
+                            else { custom.doc.gearItems.removeAll { $0 == key } }
+                        }))
+                }
+            }
+            Text("不会读取或显示序列号、硬件 UUID。").font(.system(size: 11)).foregroundStyle(Theme.text2)
+        }
+    }
+
+    @ViewBuilder
     private var pickedContentSections: some View {
         group("文案") {
             field("标题") { TextField("标题", text: $custom.doc.title) }
@@ -309,6 +348,12 @@ struct ShareHubView: View {
             }
             Text("快速添加常用分组").font(.system(size: 11)).foregroundStyle(Theme.text2)
             FlowLayout(spacing: 7) {
+                if !model.dockApps.isEmpty {
+                    let added = custom.hasGroup(named: "Dock")
+                    PresetChip(name: "Dock", added: added)
+                        .onTapGesture { if !added { withAnimation { custom.addDockGroup(model.dockApps.compactMap(\.bundleID)) } } }
+                        .help(added ? "已添加" : "把 Dock 里的软件添加成一个分组")
+                }
                 ForEach(GroupPreset.all) { preset in
                     let added = custom.hasGroup(named: preset.name)
                     PresetChip(name: preset.name, added: added)
@@ -456,7 +501,15 @@ struct ShareHubView: View {
 
     private func png() -> Data? {
         if mode == .usage { return ShareRenderer.png(style: usageStyle, data: usageData) }
-        return ShareRenderer.png(CustomShareCardView(doc: custom.doc, groups: groups))
+        return ShareRenderer.png(CustomShareCardView(doc: custom.doc, groups: mode == .gear ? [] : groups, gear: mode == .gear ? model.macProfile : nil))
+    }
+
+    /// The macOS share menu (Messages, Mail, AirDrop…). The card goes out as a PNG file; nothing is uploaded by Orbit.
+    private func shareWithSystem() {
+        guard let data = png(), let view = shareAnchor.view else { return flash("生成失败") }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Orbit 分享图.png")
+        do { try data.write(to: url) } catch { return flash("无法准备分享文件") }
+        NSSharingServicePicker(items: [url]).show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
     }
 
     private func copy() {
@@ -886,4 +939,15 @@ struct CustomAppSheet: View {
         if isNew { custom.addCustom(app, to: groupID) } else { custom.updateCustom(app) }
         dismiss()
     }
+}
+
+/// Remembers the view the system share menu should open from.
+final class ShareAnchor: ObservableObject {
+    weak var view: NSView?
+}
+
+struct ShareAnchorView: NSViewRepresentable {
+    let anchor: ShareAnchor
+    func makeNSView(context: Context) -> NSView { let v = NSView(); anchor.view = v; return v }
+    func updateNSView(_ v: NSView, context: Context) { anchor.view = v }
 }

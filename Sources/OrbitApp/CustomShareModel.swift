@@ -6,7 +6,7 @@ import SwiftUI
 // MARK: - Document
 
 enum ShareMode: String, Codable, CaseIterable, Identifiable {
-    case usage = "数据排行", picked = "自选软件"
+    case usage = "数据排行", picked = "自选软件", gear = "我的装备"
     var id: String { rawValue }
 }
 
@@ -89,6 +89,10 @@ struct CustomShareDoc: Codable, Equatable {
     var cornerRadius = 24.0
     /// Title override for the usage-ranking card; empty = automatic.
     var usageTitle = ""
+    /// "My equipment" card: title override (empty = the model name), caption, and which facts to show.
+    var gearTitle = ""
+    var gearCaption = ""
+    var gearItems: [String] = ["chip", "memory", "storage", "system"]
 
     init() {}
 
@@ -114,6 +118,9 @@ struct CustomShareDoc: Codable, Equatable {
         mode = try c.decodeIfPresent(ShareMode.self, forKey: .mode) ?? d.mode
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
         usageTitle = try c.decodeIfPresent(String.self, forKey: .usageTitle) ?? d.usageTitle
+        gearTitle = try c.decodeIfPresent(String.self, forKey: .gearTitle) ?? d.gearTitle
+        gearCaption = try c.decodeIfPresent(String.self, forKey: .gearCaption) ?? d.gearCaption
+        gearItems = try c.decodeIfPresent([String].self, forKey: .gearItems) ?? d.gearItems
     }
 }
 
@@ -366,6 +373,17 @@ final class CustomShareModel: ObservableObject {
     @Published var presetNote: String?
 
     func hasGroup(named name: String) -> Bool { doc.groups.contains { $0.name == name } }
+
+    /// Adds a group with the apps pinned in the Dock, in Dock order. Apps already in another group stay where they are.
+    func addDockGroup(_ dock: [String]) {
+        guard !hasGroup(named: "Dock") else { return }
+        let taken = Set(doc.groups.flatMap(\.bundleIDs))
+        let ids = dock.filter { !taken.contains($0) }
+        let group = ShareGroup(name: "Dock", bundleIDs: ids)
+        doc.groups.append(group)
+        activeGroup = group.id
+        presetNote = ids.isEmpty ? "Dock 里的软件都已经在其他分组里了。" : nil
+    }
 
     /// Adds a built-in group and fills it with installed apps that fit it, best recent usage first (at most 6).
     /// `scores` is `AppRecommender.recencyScores`. System tools are never recommended.

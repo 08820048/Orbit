@@ -1,4 +1,5 @@
 import AppKit
+import OrbitCore
 import SwiftUI
 
 struct ResolvedApp: Identifiable {
@@ -18,6 +19,8 @@ struct ResolvedGroup: Identifiable {
 struct CustomShareCardView: View {
     let doc: CustomShareDoc
     let groups: [ResolvedGroup]
+    /// When set, the card shows this Mac's equipment instead of app groups.
+    var gear: MacProfile? = nil
 
     private let pad: CGFloat = 40
     private let topPad: CGFloat = 34
@@ -62,10 +65,15 @@ struct CustomShareCardView: View {
 
     private func content(width w: CGFloat, height h: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            switch doc.template {
-            case .fjord, .paper: header(width: w, centered: false); labeledRows(width: w)
-            case .glass: header(width: w, centered: false); panels(width: w)
-            case .minimal: header(width: w, centered: true); iconField(width: w)
+            if let gear {
+                header(width: w, centered: false, title: doc.gearTitle.isEmpty ? gear.modelName : doc.gearTitle, caption: doc.gearCaption)
+                gearFacts(gear)
+            } else {
+                switch doc.template {
+                case .fjord, .paper: header(width: w, centered: false); labeledRows(width: w)
+                case .glass: header(width: w, centered: false); panels(width: w)
+                case .minimal: header(width: w, centered: true); iconField(width: w)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -77,23 +85,67 @@ struct CustomShareCardView: View {
 
     private var titleSize: CGFloat { doc.ratio == .landscape ? 32 : 28 }
 
-    private func header(width: CGFloat, centered: Bool) -> some View {
-        VStack(alignment: centered ? .center : .leading, spacing: 8) {
+    private func header(width: CGFloat, centered: Bool, title: String? = nil, caption: String? = nil) -> some View {
+        let title = title ?? doc.title, caption = caption ?? doc.caption
+        return VStack(alignment: centered ? .center : .leading, spacing: 8) {
             if centered {
                 Text("MY MAC").font(.system(size: 11)).tracking(4).foregroundStyle(muted)
             }
-            Text(doc.title.isEmpty ? " " : doc.title)
+            Text(title.isEmpty ? " " : title)
                 .font(doc.template == .minimal ? doc.titleFont.font(titleSize * 0.7) : doc.titleFont.font(titleSize))
                 .foregroundStyle(ink).shadow(color: .black.opacity(lightSurface ? 0 : 0.5), radius: 10, y: 2)
                 .multilineTextAlignment(centered ? .center : .leading)
-            if !doc.caption.isEmpty {
-                Text(doc.caption).font(.system(size: 12.5, weight: .light)).tracking(0.6).lineSpacing(3)
+            if !caption.isEmpty {
+                Text(caption).font(.system(size: 12.5, weight: .light)).tracking(0.6).lineSpacing(3)
                     .foregroundStyle(muted).multilineTextAlignment(centered ? .center : .leading)
                     .shadow(color: .black.opacity(lightSurface ? 0 : 0.5), radius: 6, y: 1)
             }
         }
         .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
         .padding(.bottom, 20)
+    }
+
+    // MARK: Equipment
+
+    /// The facts shown on the equipment card, in a fixed order, limited to what the user ticked.
+    private func gearRows(_ g: MacProfile) -> [(label: String, value: String)] {
+        let all: [(key: String, label: String, value: String?)] = [
+            ("chip", "芯片", g.chip), ("memory", "内存", g.memoryLabel), ("storage", "存储", g.storageLabel),
+            ("system", "系统", g.system), ("model", "机型标识", g.modelIdentifier),
+        ]
+        return all.filter { doc.gearItems.contains($0.key) }.compactMap { item in
+            guard let v = item.value, !v.isEmpty else { return nil }
+            return (item.label, v)
+        }
+    }
+
+    private var gearColumns: Int { doc.ratio == .portrait ? 1 : 2 }
+
+    private func gearFacts(_ g: MacProfile) -> some View {
+        let rows = gearRows(g)
+        let cols = gearColumns
+        return VStack(alignment: .leading, spacing: 24) {
+            ForEach(Array(Self.chunks(rows, cols).enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: 24) {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, fact in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(fact.label).font(.system(size: 11)).tracking(2).foregroundStyle(muted)
+                            Text(fact.value).font(.system(size: 24, weight: .semibold)).foregroundStyle(ink)
+                                .lineLimit(2).minimumScaleFactor(0.7)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if row.count < cols { Spacer(minLength: 0).frame(maxWidth: .infinity) }
+                }
+            }
+        }
+        .padding(.top, 8)
+        .shadow(color: .black.opacity(lightSurface ? 0 : 0.45), radius: 8, y: 1)
+    }
+
+    private func gearHeight(_ g: MacProfile) -> CGFloat {
+        let rows = max(1, Int(ceil(Double(gearRows(g).count) / Double(gearColumns))))
+        return 8 + CGFloat(rows) * 52 + CGFloat(rows - 1) * 24
     }
 
     private var footer: some View {
@@ -210,8 +262,10 @@ struct CustomShareCardView: View {
     /// Height the content needs at a given logical width (mirrors the layout above).
     private func estimatedHeight(width w: CGFloat) -> CGFloat {
         let titleH = titleSize * 1.3 * (doc.template == .minimal ? 0.7 : 1)
-        let captionLines = doc.caption.isEmpty ? 0 : doc.caption.split(separator: "\n", omittingEmptySubsequences: false).count
+        let caption = gear == nil ? doc.caption : doc.gearCaption
+        let captionLines = caption.isEmpty ? 0 : caption.split(separator: "\n", omittingEmptySubsequences: false).count
         var h = titleH + 8 + (captionLines > 0 ? CGFloat(captionLines) * 19 + 8 : 0) + 20
+        if let gear { return h + gearHeight(gear) }
         if doc.template == .minimal { h += 22 }
         let cellH = cellHeight
         switch doc.template {

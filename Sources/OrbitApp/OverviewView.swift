@@ -27,6 +27,7 @@ struct OverviewView: View {
 
     private func content(_ s: PeriodSummary) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            UsageNav()
             Text("\(model.periodTitle) · 我的 Mac 时间").font(.system(size: 38, weight: .bold))
             Text(headline(s)).font(.system(size: 13)).foregroundStyle(Theme.text2).padding(.top, 8)
 
@@ -119,6 +120,25 @@ struct OverviewView: View {
         var text = "已记录 \(s.daily.count) 天，打开过 \(s.appCount) 个应用"
         if let top = s.topApps.first { text += "；时间最多的是 \(model.catalog.info(for: top.bundleID).name)。" }
         return text
+    }
+}
+
+/// Back link and 总览 / 单个应用 switch shown at the top of the usage pages, which live under "我的 Mac".
+struct UsageNav: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Button { model.section = .home } label: {
+                HStack(spacing: 4) { Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold)); Text("我的 Mac") }
+                    .font(.system(size: 12)).foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain).focusable(false)
+            GlassSegmented(options: [AppModel.Section.overview, .app], label: { $0 == .overview ? "总览" : "单个应用" },
+                           selection: $model.section)
+            Spacer()
+        }
+        .padding(.bottom, 22)
     }
 }
 

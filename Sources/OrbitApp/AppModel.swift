@@ -5,13 +5,13 @@ import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
-    enum Section: Hashable { case overview, app, share, settings }
+    enum Section: Hashable { case home, overview, app, share, settings }
 
     enum Period: String, CaseIterable {
         case year = "年", month = "月", week = "周"
     }
 
-    @Published var section: Section = .overview
+    @Published var section: Section = .home
     @Published var period: Period = .year { didSet { recompute() } }
     @Published var access: ScreenTimeReader.Access = .unavailable
     @Published var summary: PeriodSummary?
@@ -21,6 +21,9 @@ final class AppModel: ObservableObject {
     @Published var sessionCount = 0
     @Published var earliest: Date?
     @Published var selectedApp: String?
+    /// Apps pinned in the Dock and this Mac's hardware profile, for the home page and share cards.
+    @Published var dockApps: [DockItem] = []
+    @Published var macProfile: MacProfile?
     @Published var hasOnboarded: Bool {
         didSet { UserDefaults.standard.set(hasOnboarded, forKey: "orbit.onboarded") }
     }
@@ -47,6 +50,25 @@ final class AppModel: ObservableObject {
         if hasOnboarded { startMonitor() }
         recompute()
         Task { await refresh() }
+    }
+
+    // MARK: Sources
+
+    /// Loads the Dock and hardware facts once (the hardware read takes about a second, so it runs off the main thread).
+    func loadMacFacts() async {
+        dockApps = DockReader.pinnedApps().filter { $0.bundleID != nil && $0.bundleID != "com.apple.apps.launcher" }
+        if macProfile == nil { macProfile = await Task.detached { MacProfile.current() }.value }
+    }
+
+    /// Opens the card editor on `source`.
+    func start(_ source: ShareSource) {
+        switch source {
+        case .usage: custom.doc.mode = .usage
+        case .stack: custom.doc.mode = .picked
+        case .gear: custom.doc.mode = .gear
+        default: return
+        }
+        section = .share
     }
 
     // MARK: Onboarding
