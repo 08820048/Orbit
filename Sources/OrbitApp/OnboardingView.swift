@@ -47,7 +47,7 @@ struct OnboardingView: View {
                 Button("打开系统设置") { model.openFullDiskAccessSettings() }
                     .glassButton(primary: true)
                 HStack(spacing: 7) {
-                    Circle().fill(Theme.accentHi).frame(width: 7, height: 7).shadow(color: Theme.accent, radius: 4)
+                    Circle().fill(Theme.accent).frame(width: 7, height: 7)
                     Text(model.access == .unavailable ? "没有找到屏幕使用时间数据" : "正在等待授权…")
                         .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 }
@@ -68,7 +68,7 @@ struct OnboardingView: View {
             Text("\(n)").font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(done ? Color.white : Theme.text2)
                 .frame(width: 20, height: 20)
-                .background(Circle().fill(done ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.control)))
+                .background(Circle().fill(done ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.control)))
             Text(text).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -76,8 +76,7 @@ struct OnboardingView: View {
     /// A mock of the System Settings list the user is about to see.
     private var right: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: 0x0F2C66), Color(hex: 0x060E20)], startPoint: .topTrailing, endPoint: .bottomLeading)
-            RadialGradient(colors: [Theme.accent.opacity(0.45), .clear], center: .init(x: 0.6, y: 0.2), startRadius: 0, endRadius: 320)
+            Theme.panel
             GlassIcon(index: GI.shield, size: 110).offset(x: -110, y: -150)
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
@@ -93,7 +92,6 @@ struct OnboardingView: View {
             .foregroundStyle(Color(hex: 0xEAF1FF))
             .frame(width: 330)
             .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.16), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.5), radius: 30, y: 20)
             .offset(y: 50)
         }
@@ -110,7 +108,6 @@ struct OnboardingView: View {
         .background {
             if highlight {
                 RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.accent.opacity(0.2))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accentHi.opacity(0.6), lineWidth: 1))
                     .padding(.horizontal, 4)
             }
         }

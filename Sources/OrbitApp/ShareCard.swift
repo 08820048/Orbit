@@ -3,11 +3,23 @@ import OrbitCore
 import SwiftUI
 
 enum ShareTemplate: String, CaseIterable, Identifiable {
-    case ranking = "排行榜", card = "卡片式", report = "年度报告"
+    case ranking = "排行榜", card = "卡片式", report = "年度报告", bubbles = "气泡"
     var id: String { rawValue }
     /// Card size in points; exported at 2x (1080 px wide).
-    var size: CGSize { self == .report ? CGSize(width: 540, height: 960) : CGSize(width: 540, height: 675) }
-    var ratio: String { self == .report ? "9:16 · 1080×1920" : "4:5 · 1080×1350" }
+    var size: CGSize {
+        switch self {
+        case .report: CGSize(width: 540, height: 960)
+        case .bubbles: CGSize(width: 540, height: 540)
+        default: CGSize(width: 540, height: 675)
+        }
+    }
+    var ratio: String {
+        switch self {
+        case .report: "9:16 · 1080×1920"
+        case .bubbles: "1:1 · 1080×1080"
+        default: "4:5 · 1080×1350"
+        }
+    }
 }
 
 enum BackgroundKind: String, CaseIterable { case solid = "纯色", gradient = "渐变", glass = "毛玻璃" }
@@ -50,6 +62,12 @@ struct ShareStyle {
     var showRank = true
     var showHours = true
     var topN = 10
+    /// How many apps the bubbles template shows (10 / 20 / 30).
+    var bubbleCount = 20
+    /// Space between icons, as a percentage of the biggest icon's width.
+    var bubbleSpacing = 5.0
+    /// How strongly icon size follows usage, 0–100 (0 = all the same size).
+    var bubbleContrast = 80.0
     var signature = NSFullUserName()
     var watermark = true
     /// Shared with the custom card: "default" (palette below), "builtin:<name>", "custom:<file>", "solid:<RRGGBB>".
@@ -58,6 +76,9 @@ struct ShareStyle {
     var blur = 0.0
     /// Empty = the template's automatic title.
     var title = ""
+
+    /// Number of apps the current template shows.
+    var shownCount: Int { template == .bubbles ? bubbleCount : topN }
 
     var paletteValue: CardPalette { CardPalette.all[palette] }
     var accentValue: AccentChoice { AccentChoice.all[accent] }
@@ -116,9 +137,10 @@ struct ShareCardView: View {
                 case .ranking: ranking
                 case .card: card
                 case .report: report
+                case .bubbles: bubbles
                 }
             }
-            .padding(.horizontal, 44)
+            .padding(.horizontal, style.template == .bubbles ? 0 : 44)
         }
         .frame(width: size.width, height: size.height)
         .clipShape(RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous))
@@ -325,6 +347,60 @@ struct ShareCardView: View {
             Spacer()
             Rectangle().fill(hairline).frame(height: 1)
             footer.padding(.top, 14).padding(.bottom, 36)
+        }
+    }
+
+    // MARK: Template 4: bubbles
+
+    private var bubbles: some View {
+        let size = style.template.size
+        let entries = Array(data.entries.prefix(style.bubbleCount))
+        let area = CGSize(width: size.width - 48, height: size.height - 134)
+        let packed = BubblePacking.pack(weights: entries.map(\.seconds), in: area, gap: CGFloat(style.bubbleSpacing * 2),
+                                        exponent: style.bubbleContrast / 100 * 0.5)
+        return ZStack(alignment: .topLeading) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { i, e in
+                bubble(e, packed[i].r).position(x: 24 + packed[i].x, y: 30 + packed[i].y)
+            }
+            bubbleFooter.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.horizontal, 24).padding(.bottom, 24)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    /// The app icon itself, sized by usage. No disc or ring around it.
+    private func bubble(_ e: ShareEntry, _ r: CGFloat) -> some View {
+        let side = (r * 2).rounded()
+        return ZStack(alignment: .bottom) {
+            SharpIcon(e.icon, side)
+                .shadow(color: .black.opacity(0.28), radius: side * 0.07, y: side * 0.04)
+            if style.showHours && r >= 40 {
+                Text(Fmt.short(e.seconds)).font(.system(size: 10, weight: .bold)).monospacedDigit().foregroundStyle(.white)
+                    .padding(.horizontal, 7).padding(.vertical, 2).background(.black.opacity(0.62), in: Capsule())
+                    .offset(y: 9)
+            }
+        }
+        .frame(width: side, height: side)
+    }
+
+    private var bubbleFooter: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(rankedTitle.replacingOccurrences(of: "\n", with: " ")).font(.system(size: 12, weight: .semibold))
+                Text("\(data.coverage) · 共 \(Fmt.long(data.totalSeconds))" + (style.signature.isEmpty ? "" : " · \(style.signature)"))
+                    .font(.system(size: 10)).opacity(0.7)
+            }
+            .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Color(hex: 0x2A2C33), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Spacer()
+            if style.watermark {
+                HStack(spacing: 6) {
+                    GlassIcon(index: GI.orbit, size: 16)
+                    Text("ORBIT").font(.system(size: 11, weight: .bold)).tracking(1.4).foregroundStyle(.white)
+                }
+                .padding(.horizontal, 12).frame(height: 32)
+                .background(Color(hex: 0x2A2C33), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
         }
     }
 

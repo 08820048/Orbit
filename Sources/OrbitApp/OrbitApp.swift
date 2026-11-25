@@ -1,8 +1,29 @@
 import AppKit
 import SwiftUI
 
+/// Makes sure Orbit is a regular, active app whose window is the key window. Without this a window can be
+/// visible and clickable yet never receive keyboard input (text fields look dead), e.g. when the binary is
+/// started from a terminal or by a tool that does not activate it.
+final class OrbitAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        // The SwiftUI window may not exist yet: make it key as soon as it does.
+        DispatchQueue.main.async { Self.focusMainWindow() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { Self.focusMainWindow() }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) { Self.focusMainWindow() }
+
+    static func focusMainWindow() {
+        guard let window = NSApp.windows.first(where: { $0.canBecomeKey && $0.isVisible }), !window.isKeyWindow else { return }
+        window.makeKeyAndOrderFront(nil)
+    }
+}
+
 @main
 struct OrbitApp: App {
+    @NSApplicationDelegateAdaptor(OrbitAppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel()
 
     var body: some Scene {
@@ -39,12 +60,28 @@ struct RootView: View {
     }
 }
 
+/// Page-level actions shown on the right of the top bar. A page declares them with `.topBarActions { … }`.
+struct TopBarActions { let view: AnyView }
+
+struct TopBarActionsKey: PreferenceKey {
+    static var defaultValue: TopBarActions? = nil
+    static func reduce(value: inout TopBarActions?, nextValue: () -> TopBarActions?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
+extension View {
+    func topBarActions<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        preference(key: TopBarActionsKey.self, value: TopBarActions(view: AnyView(content())))
+    }
+}
+
 struct MainView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        HStack(spacing: 0) {
-            SidebarView().frame(width: 220)
+        VStack(spacing: 0) {
+            TopBar()
             Group {
                 switch model.section {
                 case .overview: OverviewView()
@@ -53,75 +90,45 @@ struct MainView: View {
                 case .settings: SettingsView()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .overlayPreferenceValue(TopBarActionsKey.self) { actions in
+            HStack(spacing: 10) { Spacer(); actions?.view }
+                .padding(.horizontal, 20).frame(height: 56)
+                .frame(maxHeight: .infinity, alignment: .top)
+        }
+        // The bar sits in the window's top strip, level with the traffic lights.
+        .ignoresSafeArea(.container, edges: .top)
     }
 }
 
-struct SidebarView: View {
+/// Top menu: the four sections centred in the window's title strip.
+struct TopBar: View {
     @EnvironmentObject var model: AppModel
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                GlassIcon(index: GI.orbit, size: 30)
-                Text("Orbit").font(.system(size: 15, weight: .bold)).tracking(0.3)
-            }
-            .padding(.horizontal, 8).padding(.top, 34).padding(.bottom, 18)
-
-            sectionLabel("统计")
-            row("年度总览", GI.trend, .overview, meta: model.summary.map { _ in model.periodTitle })
-            row("单个应用", GI.stats, .app)
-            sectionLabel("分享").padding(.top, 14)
-            row("分享图", GI.share, .share)
-
-            Spacer()
-            row("设置", GI.gear, .settings)
-        }
-        .padding(.horizontal, 10).padding(.bottom, 16)
-        .background(Theme.sidebar)
-    }
-
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
-            .padding(.horizontal, 10).padding(.bottom, 4)
-    }
-
-    private func row(_ title: String, _ icon: Int, _ section: AppModel.Section, meta: String? = nil) -> some View {
-        let selected = model.section == section
-        return HStack(spacing: 10) {
-            GlassIcon(index: icon, size: 22)
-            Text(title).font(.system(size: 13, weight: selected ? .medium : .regular))
-            Spacer()
-            if let meta { Text(meta).font(.system(size: 11)).foregroundStyle(Theme.text2) }
-        }
-        .padding(.horizontal, 8).frame(height: 34)
-        .background {
-            if selected {
-                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.control)
-                    .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { model.section = section }
-        .accessibilityAddTraits(.isButton)
-    }
-}
-
-/// Header bar shared by the main screens.
-struct ScreenHeader<Trailing: View>: View {
-    let title: String
-    /// Sits in the window's top strip (the content must ignore the top safe area) instead of below it.
-    var compact = false
-    @ViewBuilder var trailing: Trailing
+    private static let items: [(title: String, icon: Int, section: AppModel.Section)] = [
+        ("总览", GI.trend, .overview), ("单个应用", GI.stats, .app), ("分享图", GI.share, .share), ("设置", GI.gear, .settings),
+    ]
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(title).font(.system(size: 15, weight: .semibold))
-            Spacer()
-            trailing
+        HStack(spacing: 4) {
+            ForEach(Self.items, id: \.section) { item in
+                let selected = model.section == item.section
+                HStack(spacing: 7) {
+                    GlassIcon(index: item.icon, size: 20)
+                    Text(item.title).font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(selected ? Theme.text : Theme.text2)
+                }
+                .padding(.leading, 10).padding(.trailing, 14).frame(height: 30)
+                .background {
+                    if selected { RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.control) }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { model.section = item.section }
+                .accessibilityAddTraits(.isButton)
+            }
         }
-        .padding(.horizontal, 24).padding(.top, compact ? 0 : 14).frame(height: compact ? 48 : 62, alignment: .center)
+        .frame(maxWidth: .infinity).frame(height: 56)
     }
 }
 
@@ -135,7 +142,7 @@ enum RenderCheck {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         await model.refresh()
         guard let s = model.summary else { exit(2) }
-        let entries = s.topApps.prefix(10).map {
+        let entries = s.topApps.prefix(30).map {
             let info = model.catalog.info(for: $0.bundleID)
             return ShareEntry(id: $0.bundleID, name: info.name, icon: info.icon, seconds: $0.seconds)
         }
@@ -268,6 +275,11 @@ enum RenderCheck {
         for kind in BackgroundKind.allCases {
             var st = ShareStyle(); st.background = kind
             if let png = ShareRenderer.png(style: st, data: data) { try? png.write(to: dir.appendingPathComponent("bg-\(kind.rawValue).png")) }
+        }
+        for (name, spacing, contrast, count) in [("default", 5.0, 80.0, 20), ("tight", 0.0, 80.0, 30), ("loose-even", 22.0, 30.0, 20)] {
+            var st = ShareStyle(); st.template = .bubbles; st.bubbleCount = count; st.bubbleSpacing = spacing; st.bubbleContrast = contrast
+            st.bg = "solid:A9A9AB"
+            if let png = ShareRenderer.png(style: st, data: data) { try? png.write(to: dir.appendingPathComponent("bubbles-\(name).png")) }
         }
         for t in ShareTemplate.allCases {
             var style = ShareStyle(); style.template = t

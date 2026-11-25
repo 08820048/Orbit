@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// Design tokens from the approved Doop canvas (Sk4PPlUPfx), Glass style.
+// Design tokens from the approved Doop canvas (Sk4PPlUPfx), Glass style; flat fills, no gradients in the UI chrome.
 
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -36,9 +36,6 @@ enum Theme {
     static let accent = Color.dynamic(dark: (0x3B82F6, 1), light: (0x1F6BEA, 1))
     static let accentHi = Color(hex: 0x7FB0FF)
     static let accentLo = Color(hex: 0x0B47C4)
-
-    static let accentGradient = LinearGradient(
-        colors: [accentHi.opacity(0.9), accent, accentLo], startPoint: .top, endPoint: .bottom)
 }
 
 /// Indices into the Glass icon pack (file number = index). See Design/GlassIcons.
@@ -77,11 +74,6 @@ struct GlassPanel: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Theme.panel, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
-            .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [Theme.edge, .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
-            }
     }
 }
 
@@ -98,28 +90,18 @@ struct GlassButtonStyle: ButtonStyle {
             .padding(.horizontal, 15).frame(height: 30)
             .background {
                 if primary {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.accentGradient)
-                        .shadow(color: Theme.accent.opacity(0.4), radius: 8, y: 3)
+                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.accent)
                 } else {
                     RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.control)
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(primary ? Color.white.opacity(0.25) : Theme.line, lineWidth: 0.5))
             .brightness(configuration.isPressed ? -0.08 : 0)
     }
 }
 
-/// Window ground with the soft blue glows from the design.
+/// Flat window ground.
 struct WindowBackground: View {
-    var body: some View {
-        ZStack {
-            Theme.window
-            RadialGradient(colors: [Theme.accent.opacity(0.30), .clear], center: .init(x: 0.9, y: -0.05), startRadius: 0, endRadius: 600)
-            RadialGradient(colors: [Color(hex: 0x1E5ADC, opacity: 0.22), .clear], center: .init(x: 0.05, y: 1.05), startRadius: 0, endRadius: 520)
-        }
-        .ignoresSafeArea()
-    }
+    var body: some View { Theme.window.ignoresSafeArea() }
 }
 
 /// Segmented control in the Glass style.
@@ -138,7 +120,7 @@ struct GlassSegmented<T: Hashable>: View {
                     .frame(minWidth: 40, maxWidth: fill ? .infinity : nil).frame(height: 24)
                     .background {
                         if selection == option {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accentGradient)
+                            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent)
                         }
                     }
                     .contentShape(Rectangle())
@@ -153,7 +135,7 @@ struct GlassSegmented<T: Hashable>: View {
 struct GlassToggle: View {
     @Binding var isOn: Bool
     var body: some View {
-        Capsule().fill(isOn ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.control))
+        Capsule().fill(isOn ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.control))
             .frame(width: 34, height: 20)
             .overlay(alignment: isOn ? .trailing : .leading) {
                 Circle().fill(.white).frame(width: 16, height: 16).padding(2)

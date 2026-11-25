@@ -129,6 +129,12 @@ final class AppModel: ObservableObject {
         return (d.total, d.daily.filter { $0.day >= start })
     }
 
+    /// When in the day / week an app is used, and how long its sessions are, for the selected period.
+    func insights(for bundleID: String) -> AppInsights {
+        StatsEngine(hidden: (try? store.hiddenBundleIDs()) ?? []).appInsights(
+            bundleID: bundleID, sessions: sessions, period: statsPeriod, from: summary?.coveredInterval?.start)
+    }
+
     /// Recency-weighted usage over the last 30 days, for recommending apps (independent of the selected period).
     func recencyScores() -> [String: Double] {
         let now = Date()
