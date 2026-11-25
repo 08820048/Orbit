@@ -364,24 +364,33 @@ struct AppPickerSheet: View {
                 Text("请先添加一个分组").foregroundStyle(Theme.text2).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
+                    if filter != 1 && (!visibleTools.isEmpty || (filter == 0 && query.isEmpty)) {
+                        HStack(spacing: 8) {
+                            GlassIcon(index: 2, size: 20)
+                            Text("检测到的终端工具").font(.system(size: 13, weight: .semibold))
+                            Text(custom.detectedTools.isEmpty
+                                 ? "没有在命令行里找到常见工具，可用下方「添加自定义软件」按名称添加"
+                                 : "在这台 Mac 的命令行里找到 \(custom.detectedTools.count) 个")
+                                .font(.system(size: 11)).foregroundStyle(Theme.text2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 16)
+                        if !visibleTools.isEmpty {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
+                                ForEach(visibleTools) { tool in toolTile(tool) }
+                            }
+                            .padding(.top, 10)
+                        }
+                        HStack(spacing: 8) {
+                            Text("已安装的软件").font(.system(size: 13, weight: .semibold))
+                            Text("共 \(custom.installed.count) 个").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 20)
+                    }
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
                         if filter == 0 && query.isEmpty { addTile }
                         ForEach(items) { item in tile(item) }
                     }
-                    .padding(.top, 16)
-                    if !visibleTools.isEmpty {
-                        HStack(spacing: 8) {
-                            GlassIcon(index: 2, size: 20)
-                            Text("检测到的终端工具").font(.system(size: 13, weight: .semibold))
-                            Text(custom.detectedTools.isEmpty ? "还没有在命令行里找到" : "在这台 Mac 的命令行里找到 \(custom.detectedTools.count) 个")
-                                .font(.system(size: 11)).foregroundStyle(Theme.text2)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 18)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
-                            ForEach(visibleTools) { tool in toolTile(tool) }
-                        }
-                        .padding(.top, 10)
-                    }
+                    .padding(.top, 10)
                     Color.clear.frame(height: 16)
                 }
             }
