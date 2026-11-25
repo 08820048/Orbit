@@ -170,8 +170,7 @@ enum RenderCheck {
         doc.caption = "我们塑造了工具，而后工具也在塑造我们。\n—— 马歇尔·麦克卢汉"
         model.custom.doc = doc
         func resolved(_ d: CustomShareDoc) -> [ResolvedGroup] {
-            d.groups.map { g in ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { id in
-                let i = model.catalog.info(for: id); return ResolvedApp(id: id, name: i.name, icon: i.icon) }) }
+            d.groups.map { g in ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { model.custom.resolve($0, catalog: model.catalog) }) }
         }
         for t in CustomTemplate.allCases {
             for ratio in [CanvasRatio.landscape, .portrait] {
@@ -208,6 +207,25 @@ enum RenderCheck {
         presetShot.scale = 1
         if let cg = presetShot.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-presets.png"))
+        }
+        // Custom apps: full-bleed art, a transparent logo, and no picture at all.
+        do {
+            var d = originalCustomDoc
+            var art = CustomApp(name: "Photo Art"); art.iconFile = try? CustomAppIcons.save(BackgroundStore.builtin("sunset-sea") ?? NSImage())
+            var logo = CustomApp(name: "Claude Code"); logo.iconFile = try? CustomAppIcons.save(GlassIcons.image(GI.sliders)); logo.colorHex = "D97757"
+            let plain = CustomApp(name: "Codex CLI", iconFile: nil, squircle: true, colorHex: "2F6BEA")
+            d.customApps = [art, logo, plain]
+            d.groups = [ShareGroup(name: "AI 与开发", bundleIDs: [logo.key, plain.key, art.key] + Array(top.prefix(3)))]
+            d.template = .glass
+            model.custom.doc = d
+            if let png = ShareRenderer.png(CustomShareCardView(doc: d, groups: resolved(d))) {
+                try? png.write(to: dir.appendingPathComponent("custom-apps-card.png"))
+            }
+            let sheet = ImageRenderer(content: CustomAppSheet(custom: model.custom, draft: logo, isNew: true).frame(width: 560, height: 420))
+            if let cg = sheet.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+                try? png.write(to: dir.appendingPathComponent("screen-custom-sheet.png"))
+            }
+            for a in [art, logo] { CustomAppIcons.delete(file: a.iconFile) }
         }
         model.custom.doc.groups = []
         let emptyShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))

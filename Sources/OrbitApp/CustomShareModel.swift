@@ -79,6 +79,30 @@ struct CustomShareDoc: Codable, Equatable {
     var watermark = true
     /// The first-run suggestion (top used apps) has been applied; don't redo it after the user clears groups.
     var seeded = false
+    var customApps: [CustomApp] = []
+
+    init() {}
+
+    // Missing keys fall back to defaults, so adding a field never wipes a user's saved card.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = CustomShareDoc()
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? d.title
+        caption = try c.decodeIfPresent(String.self, forKey: .caption) ?? d.caption
+        signature = try c.decodeIfPresent(String.self, forKey: .signature) ?? d.signature
+        groups = try c.decodeIfPresent([ShareGroup].self, forKey: .groups) ?? d.groups
+        template = try c.decodeIfPresent(CustomTemplate.self, forKey: .template) ?? d.template
+        ratio = try c.decodeIfPresent(CanvasRatio.self, forKey: .ratio) ?? d.ratio
+        background = try c.decodeIfPresent(String.self, forKey: .background) ?? d.background
+        overlay = try c.decodeIfPresent(Double.self, forKey: .overlay) ?? d.overlay
+        blur = try c.decodeIfPresent(Double.self, forKey: .blur) ?? d.blur
+        iconSize = try c.decodeIfPresent(IconSize.self, forKey: .iconSize) ?? d.iconSize
+        titleFont = try c.decodeIfPresent(TitleFont.self, forKey: .titleFont) ?? d.titleFont
+        showNames = try c.decodeIfPresent(Bool.self, forKey: .showNames) ?? d.showNames
+        watermark = try c.decodeIfPresent(Bool.self, forKey: .watermark) ?? d.watermark
+        seeded = try c.decodeIfPresent(Bool.self, forKey: .seeded) ?? d.seeded
+        customApps = try c.decodeIfPresent([CustomApp].self, forKey: .customApps) ?? d.customApps
+    }
 }
 
 // MARK: - Installed apps
@@ -272,6 +296,35 @@ final class CustomShareModel: ObservableObject {
         }
         for i in doc.groups.indices { doc.groups[i].bundleIDs.removeAll { $0 == bundleID } }
         doc.groups[target].bundleIDs.append(bundleID)
+    }
+
+    // MARK: Custom apps
+
+    func customApp(forKey key: String) -> CustomApp? { doc.customApps.first { $0.key == key } }
+
+    func addCustom(_ app: CustomApp, to group: UUID?) {
+        doc.customApps.append(app)
+        if let group { toggle(app.key, in: group) }
+    }
+
+    func updateCustom(_ app: CustomApp) {
+        guard let i = doc.customApps.firstIndex(where: { $0.id == app.id }) else { return }
+        doc.customApps[i] = app
+    }
+
+    func removeCustom(_ app: CustomApp) {
+        doc.customApps.removeAll { $0.id == app.id }
+        for i in doc.groups.indices { doc.groups[i].bundleIDs.removeAll { $0 == app.key } }
+        CustomAppIcons.delete(file: app.iconFile)
+    }
+
+    /// Name and icon for a group entry, whether it is an installed app or a custom one.
+    func resolve(_ key: String, catalog: AppCatalog) -> ResolvedApp {
+        if let custom = customApp(forKey: key) {
+            return ResolvedApp(id: key, name: custom.name, icon: CustomAppIcons.render(custom))
+        }
+        let info = catalog.info(for: key)
+        return ResolvedApp(id: key, name: info.name, icon: info.icon)
     }
 
     // MARK: Presets

@@ -11,10 +11,7 @@ struct CustomShareView: View {
 
     private var groups: [ResolvedGroup] {
         custom.doc.groups.map { g in
-            ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { id in
-                let info = model.catalog.info(for: id)
-                return ResolvedApp(id: id, name: info.name, icon: info.icon)
-            })
+            ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { custom.resolve($0, catalog: model.catalog) })
         }
     }
 
@@ -298,29 +295,40 @@ struct CustomShareView: View {
 
 // MARK: - Picker
 
+private struct PickItem: Identifiable {
+    let id: String          // bundle id, or "custom:<uuid>"
+    let name: String
+    var custom: CustomApp?
+}
+
 struct AppPickerSheet: View {
     @EnvironmentObject var model: AppModel
     @ObservedObject var custom: CustomShareModel
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var filter = 0   // 0 all, 1 recent, 2 selected
+    @State private var editing: CustomApp?
+    @State private var editingIsNew = false
 
-    private var recentOrder: [String: Int] {
-        Dictionary(uniqueKeysWithValues: (model.summary?.topApps ?? []).enumerated().map { ($1.bundleID, $0) })
-    }
+    private var recentOrder: [String: Double] { model.recencyScores() }
 
-    private var apps: [InstalledApp] {
-        var list = custom.installed
+    private var items: [PickItem] {
         let activeIDs = Set(custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs ?? [])
+        var customs = custom.doc.customApps.map { PickItem(id: $0.key, name: $0.name, custom: $0) }
+        var installed = custom.installed.map { PickItem(id: $0.bundleID, name: $0.name, custom: nil) }
         switch filter {
         case 1:
-            let order = recentOrder
-            list = list.filter { order[$0.bundleID] != nil }.sorted { order[$0.bundleID]! < order[$1.bundleID]! }
-        case 2: list = list.filter { activeIDs.contains($0.bundleID) }
+            let scores = recentOrder
+            customs = []
+            installed = installed.filter { (scores[$0.id] ?? 0) > 0 }.sorted { (scores[$0.id] ?? 0) > (scores[$1.id] ?? 0) }
+        case 2:
+            customs = customs.filter { activeIDs.contains($0.id) }
+            installed = installed.filter { activeIDs.contains($0.id) }
         default: break
         }
+        let all = customs + installed
         let q = query.trimmingCharacters(in: .whitespaces)
-        return q.isEmpty ? list : list.filter { $0.name.localizedCaseInsensitiveContains(q) || $0.bundleID.localizedCaseInsensitiveContains(q) }
+        return q.isEmpty ? all : all.filter { $0.name.localizedCaseInsensitiveContains(q) || $0.id.localizedCaseInsensitiveContains(q) }
     }
 
     var body: some View {
@@ -329,7 +337,8 @@ struct AppPickerSheet: View {
                 GlassIcon(index: GI.stats, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("选择软件").font(.system(size: 20, weight: .bold))
-                    Text("来自这台 Mac 的「应用程序」，图标由 Orbit 自动读取").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    Text("来自这台 Mac 的「应用程序」；没有图标的工具（如 Claude Code）可以自己添加")
+                        .font(.system(size: 12)).foregroundStyle(Theme.text2)
                 }
                 Spacer()
                 Text("添加到").font(.system(size: 12)).foregroundStyle(Theme.text2)
@@ -345,18 +354,19 @@ struct AppPickerSheet: View {
                 }
                 .padding(.horizontal, 12).frame(height: 34)
                 .background(Theme.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                GlassSegmented(options: [0, 1, 2], label: { ["全部 \(custom.installed.count)", "最近常用", "已选"][$0] }, selection: $filter)
+                GlassSegmented(options: [0, 1, 2], label: { ["全部 \(custom.installed.count + custom.doc.customApps.count)", "最近常用", "已选"][$0] }, selection: $filter)
             }
             .padding(.top, 18)
 
-            if custom.installed.isEmpty {
+            if custom.installed.isEmpty && custom.doc.customApps.isEmpty {
                 ProgressView("正在读取已安装软件…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if custom.doc.groups.isEmpty {
                 Text("请先添加一个分组").foregroundStyle(Theme.text2).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
-                        ForEach(apps) { app in tile(app) }
+                        if filter == 0 && query.isEmpty { addTile }
+                        ForEach(items) { item in tile(item) }
                     }
                     .padding(.vertical, 16)
                 }
@@ -373,18 +383,40 @@ struct AppPickerSheet: View {
         .background(WindowBackground())
         .foregroundStyle(Theme.text)
         .onAppear { if custom.activeGroup == nil { custom.activeGroup = custom.doc.groups.first?.id } }
+        .sheet(item: $editing) { app in
+            CustomAppSheet(custom: custom, draft: app, isNew: editingIsNew)
+        }
     }
 
-    private func tile(_ app: InstalledApp) -> some View {
-        let info = model.catalog.info(for: app.bundleID)
-        let owner = custom.groupName(containing: app.bundleID)
-        let inActive = custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs.contains(app.bundleID) ?? false
+    private var addTile: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "plus").font(.system(size: 22, weight: .medium)).foregroundStyle(Theme.accentHi)
+                .frame(width: 48, height: 48)
+                .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .strokeBorder(Theme.accentHi.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+            Text("添加自定义软件").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accentHi).lineLimit(1)
+            Text("终端工具 / 无图标").font(.system(size: 10)).foregroundStyle(Theme.text2)
+        }
+        .padding(.horizontal, 6).padding(.top, 14).padding(.bottom, 10).frame(maxWidth: .infinity)
+        .background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.accentHi.opacity(0.5), lineWidth: 1))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            editingIsNew = true
+            editing = CustomApp(name: "")
+        }
+    }
+
+    private func tile(_ item: PickItem) -> some View {
+        let resolved = custom.resolve(item.id, catalog: model.catalog)
+        let owner = custom.groupName(containing: item.id)
+        let inActive = custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs.contains(item.id) ?? false
         let other = owner != nil && !inActive
         return VStack(spacing: 6) {
-            SharpIcon(info.icon, 48)
-                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
-            Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-            Text(owner ?? " ").font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)
+            SharpIcon(resolved.icon, 48).shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+            Text(resolved.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+            Text(item.custom != nil ? "自定义" + (owner.map { " · \($0)" } ?? " · 可编辑") : (owner ?? " "))
+                .font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)
         }
         .padding(.horizontal, 6).padding(.top, 14).padding(.bottom, 10).frame(maxWidth: .infinity)
         .opacity(other ? 0.55 : 1)
@@ -398,6 +430,170 @@ struct AppPickerSheet: View {
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture { if let g = custom.activeGroup { custom.toggle(app.bundleID, in: g) } }
+        .onTapGesture { if let g = custom.activeGroup { custom.toggle(item.id, in: g) } }
+        .contextMenu {
+            if let app = item.custom {
+                Button("编辑…") { editingIsNew = false; editing = app }
+                Button("删除", role: .destructive) { custom.removeCustom(app) }
+            }
+        }
+    }
+}
+
+// MARK: - Add / edit a custom app
+
+struct CustomAppSheet: View {
+    @ObservedObject var custom: CustomShareModel
+    @Environment(\.dismiss) private var dismiss
+    @State var draft: CustomApp
+    let isNew: Bool
+    @State private var pending: NSImage?
+    @State private var targeted = false
+    @State private var error: String?
+    @State private var groupID: UUID?
+
+    init(custom: CustomShareModel, draft: CustomApp, isNew: Bool) {
+        self.custom = custom
+        _draft = State(initialValue: draft)
+        self.isNew = isNew
+        _groupID = State(initialValue: custom.activeGroup)
+    }
+
+    private static let swatches = ["D97757", "1A1D24", "F5F5F2", "2F6BEA", "2E9B6A", "7B5CE0"]
+    private var canAdd: Bool { !draft.name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                GlassIcon(index: GI.megaphone, size: 36)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isNew ? "添加自定义软件" : "编辑自定义软件").font(.system(size: 15, weight: .bold))
+                    Text("图片只保存在这台 Mac 上，不上传").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                }
+            }
+            HStack(alignment: .top, spacing: 22) {
+                VStack(alignment: .leading, spacing: 8) {
+                    label("图标")
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.accent.opacity(targeted ? 0.18 : 0.07))
+                        RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.accentHi.opacity(0.5), lineWidth: 1)
+                        VStack(spacing: 8) {
+                            SharpIcon(CustomAppIcons.render(draft, image: pending ?? CustomAppIcons.loadFile(draft.iconFile)), 84)
+                                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+                            Text("拖入图片到这里").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                        }
+                    }
+                    .frame(width: 150, height: 150)
+                    .onDrop(of: [.fileURL, .image], isTargeted: $targeted) { providers in load(providers) }
+                    Button("选择图片…") { choose() }.glassButton()
+                    Button("粘贴剪贴板图片") { paste() }.glassButton()
+                    if draft.iconFile != nil || pending != nil {
+                        Button("移除图片") { pending = nil; draft.iconFile = nil }.buttonStyle(.plain).focusable(false)
+                            .font(.system(size: 11)).foregroundStyle(Theme.text2)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        label("名称")
+                        TextField("例如 Claude Code", text: $draft.name).textFieldStyle(.plain).font(.system(size: 13))
+                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .background(Theme.control, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    VStack(alignment: .leading, spacing: 5) {
+                        label("图标样式")
+                        GlassSegmented(options: [true, false], label: { $0 ? "自动圆角方形" : "保持原样" }, selection: $draft.squircle, fill: true)
+                    }
+                    VStack(alignment: .leading, spacing: 5) {
+                        label("底色（图片带透明背景，或没有图片时使用）")
+                        HStack(spacing: 10) {
+                            ForEach(Self.swatches, id: \.self) { hex in
+                                Circle().fill(Color(hexString: hex)).frame(width: 22, height: 22)
+                                    .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)).padding(2)
+                                    .overlay(Circle().strokeBorder(draft.colorHex == hex ? Theme.accentHi : .clear, lineWidth: 2))
+                                    .onTapGesture { draft.colorHex = hex }
+                            }
+                        }
+                    }
+                    if isNew {
+                        VStack(alignment: .leading, spacing: 5) {
+                            label("添加到分组")
+                            Picker("", selection: Binding(get: { groupID ?? UUID() }, set: { groupID = $0 })) {
+                                ForEach(custom.doc.groups) { Text($0.name).tag($0.id) }
+                            }
+                            .labelsHidden()
+                        }
+                    }
+                    if let error { Text(error).font(.system(size: 11)).foregroundStyle(.orange) }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.top, 20)
+            Spacer(minLength: 16)
+            HStack {
+                Spacer()
+                Button("取消") { dismiss() }.glassButton().keyboardShortcut(.cancelAction)
+                Button(isNew ? "添加" : "保存") { commit() }.glassButton(primary: true)
+                    .keyboardShortcut(.defaultAction).disabled(!canAdd)
+            }
+        }
+        .padding(24).frame(width: 560, height: 420)
+        .background(WindowBackground())
+        .foregroundStyle(Theme.text)
+    }
+
+    private func label(_ text: String) -> some View {
+        Text(text).font(.system(size: 11)).foregroundStyle(Theme.text2)
+    }
+
+    // MARK: Image input
+
+    private func choose() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        set(NSImage(contentsOf: url))
+    }
+
+    private func paste() {
+        set(NSImage(pasteboard: .general))
+    }
+
+    private func load(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        if provider.canLoadObject(ofClass: NSImage.self) {
+            _ = provider.loadObject(ofClass: NSImage.self) { object, _ in
+                DispatchQueue.main.async { set(object as? NSImage) }
+            }
+            return true
+        }
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            var url: URL?
+            if let data = item as? Data { url = URL(dataRepresentation: data, relativeTo: nil) } else if let u = item as? URL { url = u }
+            DispatchQueue.main.async { set(url.flatMap { NSImage(contentsOf: $0) }) }
+        }
+        return true
+    }
+
+    private func set(_ image: NSImage?) {
+        guard let image, image.isValid else { error = "没有读到可用的图片，请换一张（PNG / JPG / HEIC / SVG）。"; return }
+        error = nil
+        pending = image
+    }
+
+    private func commit() {
+        var app = draft
+        app.name = app.name.trimmingCharacters(in: .whitespaces)
+        do {
+            if let pending {
+                CustomAppIcons.delete(file: custom.customApp(forKey: app.key)?.iconFile)
+                app.iconFile = try CustomAppIcons.save(pending)
+            }
+        } catch {
+            self.error = "保存图片失败：\(error.localizedDescription)"
+            return
+        }
+        if isNew { custom.addCustom(app, to: groupID) } else { custom.updateCustom(app) }
+        dismiss()
     }
 }
