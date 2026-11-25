@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
-    enum Section: Hashable { case overview, app, share, custom, settings }
+    enum Section: Hashable { case overview, app, share, settings }
 
     enum Period: String, CaseIterable {
         case year = "年", month = "月", week = "周"
@@ -29,6 +29,8 @@ final class AppModel: ObservableObject {
     let reader = ScreenTimeReader()
     let catalog = AppCatalog()
     let custom = CustomShareModel()
+    /// Layout choices of the usage-ranking share card (session-only; the shared look lives in `custom.doc`).
+    @Published var dataStyle = ShareStyle()
     private(set) var monitor: ForegroundMonitor?
     private var sessions: [UsageSession] = []
     private var terminateObserver: NSObjectProtocol?

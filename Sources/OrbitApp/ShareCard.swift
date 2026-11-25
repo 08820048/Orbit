@@ -52,6 +52,12 @@ struct ShareStyle {
     var topN = 10
     var signature = NSFullUserName()
     var watermark = true
+    /// Shared with the custom card: "default" (palette below), "builtin:<name>", "custom:<file>", "solid:<RRGGBB>".
+    var bg = "default"
+    var overlay = 0.6
+    var blur = 0.0
+    /// Empty = the template's automatic title.
+    var title = ""
 
     var paletteValue: CardPalette { CardPalette.all[palette] }
     var accentValue: AccentChoice { AccentChoice.all[accent] }
@@ -86,10 +92,20 @@ struct ShareCardView: View {
     let data: ShareData
 
     private var palette: CardPalette { style.paletteValue }
-    private var ink: Color { palette.isLight ? Color(hex: 0x0F1A33) : Color(hex: 0xF2F6FF) }
-    private var muted: Color { palette.isLight ? Color(hex: 0x4A5C80) : Color(hex: 0x9FB4DA) }
-    private var hairline: Color { palette.isLight ? Color(hex: 0x0F1A33, opacity: 0.14) : .white.opacity(0.14) }
-    private var hi: Color { palette.isLight ? style.accentValue.lo : style.accentValue.hi }
+    private var photo: NSImage? {
+        if style.bg.hasPrefix("builtin:") { return BackgroundStore.builtin(String(style.bg.dropFirst(8))) }
+        if style.bg.hasPrefix("custom:") { return BackgroundStore.custom(String(style.bg.dropFirst(7))) }
+        return nil
+    }
+    private var light: Bool {
+        if style.bg.hasPrefix("solid:") { return CustomShareCardView.isLight(hex: String(style.bg.dropFirst(6))) }
+        if photo != nil { return false }
+        return palette.isLight
+    }
+    private var ink: Color { light ? Color(hex: 0x0F1A33) : Color(hex: 0xF2F6FF) }
+    private var muted: Color { light ? Color(hex: 0x4A5C80) : Color(hex: 0x9FB4DA) }
+    private var hairline: Color { light ? Color(hex: 0x0F1A33, opacity: 0.14) : .white.opacity(0.14) }
+    private var hi: Color { light ? style.accentValue.lo : style.accentValue.hi }
 
     var body: some View {
         let size = style.template.size
@@ -112,15 +128,34 @@ struct ShareCardView: View {
 
     @ViewBuilder
     private func background(_ size: CGSize) -> some View {
+        if style.bg.hasPrefix("solid:") {
+            Color(hexString: String(style.bg.dropFirst(6)))
+        } else if let image = photo {
+            ZStack {
+                Image(nsImage: image).resizable().scaledToFill()
+                    .frame(width: size.width, height: size.height).clipped()
+                    .scaleEffect(1 + style.blur / 160).blur(radius: style.blur)
+                    .frame(width: size.width, height: size.height).clipped()
+                Color.black.opacity(style.overlay * 0.45)
+                LinearGradient(colors: [Color(hex: 0x08141E, opacity: style.overlay * 0.9), .clear, Color(hex: 0x061018, opacity: style.overlay * 0.7)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+        } else {
+            paletteBackground(size)
+        }
+    }
+
+    @ViewBuilder
+    private func paletteBackground(_ size: CGSize) -> some View {
         switch style.background {
         case .solid:
             palette.top
         case .gradient:
             ZStack {
                 LinearGradient(colors: [palette.top, palette.bottom], startPoint: .top, endPoint: .bottom)
-                RadialGradient(colors: [style.accentValue.lo.opacity(palette.isLight ? 0.25 : 0.5), .clear],
+                RadialGradient(colors: [style.accentValue.lo.opacity(light ? 0.25 : 0.5), .clear],
                                center: .init(x: 0.85, y: 0), startRadius: 0, endRadius: size.width * 0.9)
-                RadialGradient(colors: [style.accentValue.lo.opacity(palette.isLight ? 0.18 : 0.35), .clear],
+                RadialGradient(colors: [style.accentValue.lo.opacity(light ? 0.18 : 0.35), .clear],
                                center: .init(x: 0.05, y: 1), startRadius: 0, endRadius: size.width * 0.8)
             }
         case .glass:
@@ -128,7 +163,7 @@ struct ShareCardView: View {
                 LinearGradient(colors: [palette.top, palette.bottom], startPoint: .topLeading, endPoint: .bottomTrailing)
                 Circle().fill(style.accentValue.lo).frame(width: 320).blur(radius: 70).offset(x: 140, y: -size.height * 0.3)
                 Circle().fill(style.accentValue.hi.opacity(0.7)).frame(width: 220).blur(radius: 70).offset(x: -150, y: size.height * 0.32)
-                Rectangle().fill(.white.opacity(palette.isLight ? 0.35 : 0.06))
+                Rectangle().fill(.white.opacity(light ? 0.35 : 0.06))
             }
         }
     }
@@ -154,6 +189,7 @@ struct ShareCardView: View {
     }
 
     private var rankedTitle: String {
+        if !style.title.isEmpty { return style.title }
         switch data.periodTitle {
         case let t where t.hasPrefix("最近"): return "\(t)\n我最常用的 Mac 应用"
         case let t where t.hasSuffix("月"): return "\(t)我最常用的\nMac 应用"
@@ -242,7 +278,7 @@ struct ShareCardView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(14).frame(maxWidth: .infinity)
-                    .background(.white.opacity(palette.isLight ? 0.55 : 0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(.white.opacity(light ? 0.55 : 0.07), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(hairline, lineWidth: 0.5))
                 }
             }
@@ -260,7 +296,7 @@ struct ShareCardView: View {
             Text(data.periodTitle).font(.system(size: data.periodTitle.count > 4 ? 64 : 100, weight: .bold)).tracking(-2)
                 .foregroundStyle(LinearGradient(colors: [ink, hi], startPoint: .top, endPoint: .bottom))
                 .lineLimit(1).minimumScaleFactor(0.5).padding(.top, 14)
-            Text("我在 Mac 上的这段时光").font(.system(size: 26, weight: .bold)).foregroundStyle(ink).padding(.top, 6)
+            Text(style.title.isEmpty ? "我在 Mac 上的这段时光" : style.title).font(.system(size: 26, weight: .bold)).foregroundStyle(ink).padding(.top, 6)
             Text("\(data.coverage)，我把 \(Fmt.long(data.totalSeconds)) 交给了屏幕。")
                 .font(.system(size: 13, weight: .light)).foregroundStyle(muted).lineSpacing(5).padding(.top, 12)
 

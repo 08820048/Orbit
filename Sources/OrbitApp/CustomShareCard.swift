@@ -57,7 +57,7 @@ struct CustomShareCardView: View {
                 .frame(width: size.width, height: size.height, alignment: .topLeading)
         }
         .frame(width: size.width, height: size.height)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: doc.cornerRadius, style: .continuous))
     }
 
     private func content(width w: CGFloat, height h: CGFloat) -> some View {

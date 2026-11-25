@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct CustomShareView: View {
+struct ShareHubView: View {
     @EnvironmentObject var model: AppModel
     @ObservedObject var custom: CustomShareModel
     @State private var showPicker = false
@@ -15,17 +15,54 @@ struct CustomShareView: View {
         }
     }
 
+    private var mode: ShareMode { custom.doc.mode }
+
+    /// Usage-ranking data for the current period.
+    private var usageData: ShareData {
+        guard let s = model.summary else { return .placeholder }
+        let entries = s.topApps.prefix(10).map { app -> ShareEntry in
+            let info = model.catalog.info(for: app.bundleID)
+            return ShareEntry(id: app.bundleID, name: info.name, icon: info.icon, seconds: app.seconds)
+        }
+        return ShareData(
+            periodTitle: model.periodTitle,
+            coverage: "记录 \(s.daily.count) 天",
+            totalSeconds: s.totalSeconds, averageSeconds: s.averagePerActiveDay,
+            longestDay: s.longestDay, appCount: s.appCount,
+            share: s.totalSeconds > 0 ? (s.topApps.first?.seconds ?? 0) / s.totalSeconds : 0,
+            entries: Array(entries))
+    }
+
+    /// The ranking card's style: its own layout choices plus the look shared with the picked-apps card.
+    private var usageStyle: ShareStyle {
+        var s = model.dataStyle
+        s.bg = custom.doc.background
+        s.overlay = custom.doc.overlay
+        s.blur = custom.doc.blur
+        s.cornerRadius = custom.doc.cornerRadius
+        s.signature = custom.doc.signature
+        s.watermark = custom.doc.watermark
+        s.title = custom.doc.usageTitle
+        return s
+    }
+
+    private var canExport: Bool { mode == .usage ? !usageData.isEmpty : custom.totalApps > 0 }
+
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "自定义分享") {
-                Text("\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件")
+            ScreenHeader(title: "分享图") {
+                Text(mode == .usage
+                     ? "\(model.periodTitle) · Top \(model.dataStyle.topN)"
+                     : "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件")
                     .font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
-                Button("存储为 PNG…") { save() }.glassButton().disabled(custom.totalApps == 0)
+                Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
                 Button("拷贝图片  ⌘C") { copy() }.glassButton(primary: true)
-                    .keyboardShortcut("c", modifiers: .command).disabled(custom.totalApps == 0)
+                    .keyboardShortcut("c", modifiers: .command).disabled(!canExport)
             }
             HStack(spacing: 0) {
-                preview
+                Group {
+                    if mode == .usage { usagePreview } else { preview }
+                }
                 inspector.frame(width: 340)
             }
         }
@@ -44,6 +81,29 @@ struct CustomShareView: View {
     }
 
     // MARK: Preview
+
+    private var usagePreview: some View {
+        GeometryReader { geo in
+            let data = usageData, style = usageStyle
+            let size = style.template.size
+            let s = min((geo.size.width - 80) / size.width, (geo.size.height - 90) / size.height, 1)
+            ZStack {
+                if data.isEmpty {
+                    EmptyStateView().frame(width: geo.size.width, height: geo.size.height)
+                } else {
+                    ShareCardView(style: style, data: data)
+                        .scaleEffect(s, anchor: .center)
+                        .frame(width: size.width * s, height: size.height * s)
+                        .shadow(color: .black.opacity(0.5), radius: 40, y: 24)
+                        .shadow(color: Theme.accent.opacity(0.25), radius: 40)
+                        .position(x: geo.size.width / 2, y: (geo.size.height - 24) / 2)
+                    Text("\(style.template.ratio) · 适合朋友圈 / 小红书").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                        .position(x: geo.size.width / 2, y: geo.size.height - 16)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
 
     private var preview: some View {
         GeometryReader { geo in
@@ -82,70 +142,61 @@ struct CustomShareView: View {
     private var inspector: some View {
         OScroll {
             VStack(spacing: 0) {
-                group(GI.docs, "文案") {
-                    field("标题") { TextField("标题", text: $custom.doc.title) }
-                    field("文案（可留空，可换行）") { TextField("一句话", text: $custom.doc.caption, axis: .vertical).lineLimit(1...3) }
-                    field("署名") { TextField("署名", text: $custom.doc.signature) }
+                group(GI.swap, "内容来源") {
+                    GlassSegmented(options: ShareMode.allCases, label: \.rawValue, selection: $custom.doc.mode, fill: true)
+                    Text(mode == .usage ? "用真实的使用时长生成排行、年度报告。" : "自己挑选想展示的软件，分组后生成分享图。")
+                        .font(.system(size: 11)).foregroundStyle(Theme.text2)
                 }
-                group(GI.stats, "软件与分组") {
-                    if custom.doc.groups.isEmpty {
-                        Text("还没有分组").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                            .frame(maxWidth: .infinity).padding(.vertical, 14)
-                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
-                    }
-                    ForEach(custom.doc.groups) { g in groupRow(g) }
-                    if let note = custom.presetNote {
-                        HStack(alignment: .top, spacing: 8) {
-                            GlassIcon(index: GI.shield, size: 18)
-                            Text(note).font(.system(size: 11)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.horizontal, 11).padding(.vertical, 9).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accentHi.opacity(0.4), lineWidth: 0.5))
-                        .transition(.opacity)
-                    }
-                    Text("快速添加常用分组").font(.system(size: 11)).foregroundStyle(Theme.text2)
-                    FlowLayout(spacing: 7) {
-                        ForEach(GroupPreset.all) { preset in
-                            let added = custom.hasGroup(named: preset.name)
-                            PresetChip(name: preset.name, added: added)
-                                .onTapGesture { if !added { withAnimation { custom.addPreset(preset, scores: model.recencyScores()) } } }
-                                .help(added ? "已添加" : "添加「\(preset.name)」并按类别推荐软件")
-                        }
-                    }
-                    HStack(spacing: 8) {
-                        Button("从已安装软件中选择…") { showPicker = true }.glassButton(primary: true)
-                        Button("+ 自定义分组") { custom.addGroup() }.glassButton()
-                    }
-                }
-                group(GI.layout, "模板风格") {
-                    HStack(spacing: 8) {
-                        ForEach(CustomTemplate.allCases) { t in
-                            Text(t.rawValue).font(.system(size: 11)).foregroundStyle(t == .paper ? Color(hex: 0x2A2620) : .white)
-                                .frame(maxWidth: .infinity, minHeight: 64, alignment: .bottomLeading).padding(7)
-                                .background(thumb(t), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .strokeBorder(custom.doc.template == t ? Theme.accentHi : Theme.line, lineWidth: custom.doc.template == t ? 2 : 0.5))
-                                .onTapGesture { custom.doc.template = t }
-                        }
-                    }
-                    Text(custom.doc.template.blurb).font(.system(size: 11)).foregroundStyle(Theme.text2)
-                    row("比例") { GlassSegmented(options: CanvasRatio.allCases, label: \.rawValue, selection: $custom.doc.ratio) }
-                }
+                if mode == .usage { usageSections } else { pickedSections }
                 group(GI.background, "背景") {
                     GlassSegmented(options: [0, 1, 2], label: { ["内置", "我的图片", "纯色"][$0] }, selection: $bgTab, fill: true)
                     backgroundPicker
-                    if custom.doc.background.hasPrefix("builtin:") || custom.doc.background.hasPrefix("custom:") || (custom.doc.background == "default" && custom.doc.template == .fjord) {
+                    if custom.doc.background.hasPrefix("builtin:") || custom.doc.background.hasPrefix("custom:")
+                        || (mode == .picked && custom.doc.background == "default" && custom.doc.template == .fjord) {
                         row("遮罩强度") { Text("\(Int(custom.doc.overlay * 100))%").foregroundStyle(Theme.text2) }
                         Slider(value: $custom.doc.overlay, in: 0...1)
                         row("背景模糊") { Text("\(Int(custom.doc.blur))").foregroundStyle(Theme.text2) }
                         Slider(value: $custom.doc.blur, in: 0...30)
                     }
+                    if mode == .usage && custom.doc.background == "default" {
+                        GlassSegmented(options: BackgroundKind.allCases, label: \.rawValue, selection: $model.dataStyle.background, fill: true)
+                        HStack(spacing: 10) {
+                            ForEach(CardPalette.all) { p in
+                                Circle().fill(LinearGradient(colors: [p.top, p.bottom], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 22, height: 22)
+                                    .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+                                    .padding(2)
+                                    .overlay(Circle().strokeBorder(model.dataStyle.palette == p.id ? Theme.accentHi : .clear, lineWidth: 2))
+                                    .onTapGesture { model.dataStyle.palette = p.id }
+                            }
+                        }
+                    }
                 }
-                group(GI.sliders, "图标与文字") {
-                    row("图标大小") { GlassSegmented(options: IconSize.allCases, label: \.rawValue, selection: $custom.doc.iconSize) }
-                    row("标题字体") { GlassSegmented(options: TitleFont.allCases, label: \.rawValue, selection: $custom.doc.titleFont) }
-                    row("显示软件名称") { GlassToggle(isOn: $custom.doc.showNames) }
+                group(GI.sliders, "外观") {
+                    if mode == .picked {
+                        row("比例") { GlassSegmented(options: CanvasRatio.allCases, label: \.rawValue, selection: $custom.doc.ratio) }
+                    }
+                    row("圆角") { Text("\(Int(custom.doc.cornerRadius)) pt").foregroundStyle(Theme.text2).monospacedDigit() }
+                    Slider(value: $custom.doc.cornerRadius, in: 0...56, step: 2)
+                    if mode == .picked {
+                        row("图标大小") { GlassSegmented(options: IconSize.allCases, label: \.rawValue, selection: $custom.doc.iconSize) }
+                        row("标题字体") { GlassSegmented(options: TitleFont.allCases, label: \.rawValue, selection: $custom.doc.titleFont) }
+                        row("显示软件名称") { GlassToggle(isOn: $custom.doc.showNames) }
+                    } else {
+                        row("主题色") {
+                            HStack(spacing: 9) {
+                                ForEach(AccentChoice.all) { a in
+                                    Circle().fill(LinearGradient(colors: [a.hi, a.lo], startPoint: .top, endPoint: .bottom))
+                                        .frame(width: 18, height: 18).padding(2)
+                                        .overlay(Circle().strokeBorder(model.dataStyle.accent == a.id ? Theme.accentHi : .clear, lineWidth: 2))
+                                        .onTapGesture { model.dataStyle.accent = a.id }
+                                }
+                            }
+                        }
+                        row("应用图标") { GlassToggle(isOn: $model.dataStyle.showIcons) }
+                        row("排名序号") { GlassToggle(isOn: $model.dataStyle.showRank) }
+                        row("具体时长") { GlassToggle(isOn: $model.dataStyle.showHours) }
+                    }
                     row("Orbit 水印") { GlassToggle(isOn: $custom.doc.watermark) }
                 }
             }
@@ -153,12 +204,100 @@ struct CustomShareView: View {
         .background(Theme.sidebar)
     }
 
+    @ViewBuilder
+    private var usageSections: some View {
+        group(GI.docs, "文案") {
+            field("标题（留空自动生成）") { TextField("自动", text: $custom.doc.usageTitle, axis: .vertical).lineLimit(1...3) }
+            field("署名") { TextField("署名", text: $custom.doc.signature) }
+        }
+        group(GI.calendar, "数据范围") {
+            GlassSegmented(options: AppModel.Period.allCases, label: \.rawValue, selection: $model.period, fill: true)
+            row("显示数量") { GlassSegmented(options: [5, 10], label: { "Top \($0)" }, selection: $model.dataStyle.topN) }
+        }
+        group(GI.layout, "版式") {
+            HStack(spacing: 8) {
+                ForEach(ShareTemplate.allCases) { t in
+                    Text(t.rawValue).font(.system(size: 11)).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 64, alignment: .bottomLeading).padding(7)
+                        .background(usageThumb(t), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(model.dataStyle.template == t ? Theme.accentHi : Theme.line, lineWidth: model.dataStyle.template == t ? 2 : 0.5))
+                        .onTapGesture { model.dataStyle.template = t }
+                }
+            }
+            row("尺寸") { Text(model.dataStyle.template.ratio).foregroundStyle(Theme.text2) }
+        }
+    }
+
+    private func usageThumb(_ t: ShareTemplate) -> some ShapeStyle {
+        switch t {
+        case .ranking: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x0F2C66), Color(hex: 0x060E20)], startPoint: .top, endPoint: .bottom))
+        case .card: AnyShapeStyle(RadialGradient(colors: [Theme.accent.opacity(0.7), Color(hex: 0x060E20)], center: .init(x: 0.5, y: 0.35), startRadius: 0, endRadius: 60))
+        case .report: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x0F2C66), Color(hex: 0x0A1B44)], startPoint: .topTrailing, endPoint: .bottomLeading))
+        }
+    }
+
+    @ViewBuilder
+    private var pickedSections: some View {
+        group(GI.docs, "文案") {
+            field("标题") { TextField("标题", text: $custom.doc.title) }
+            field("文案（可留空，可换行）") { TextField("一句话", text: $custom.doc.caption, axis: .vertical).lineLimit(1...3) }
+            field("署名") { TextField("署名", text: $custom.doc.signature) }
+        }
+        group(GI.stats, "软件与分组") {
+            if custom.doc.groups.isEmpty {
+                Text("还没有分组").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
+            }
+            ForEach(custom.doc.groups) { g in groupRow(g) }
+            if let note = custom.presetNote {
+                HStack(alignment: .top, spacing: 8) {
+                    GlassIcon(index: GI.shield, size: 18)
+                    Text(note).font(.system(size: 11)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 11).padding(.vertical, 9).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accentHi.opacity(0.4), lineWidth: 0.5))
+                .transition(.opacity)
+            }
+            Text("快速添加常用分组").font(.system(size: 11)).foregroundStyle(Theme.text2)
+            FlowLayout(spacing: 7) {
+                ForEach(GroupPreset.all) { preset in
+                    let added = custom.hasGroup(named: preset.name)
+                    PresetChip(name: preset.name, added: added)
+                        .onTapGesture { if !added { withAnimation { custom.addPreset(preset, scores: model.recencyScores()) } } }
+                        .help(added ? "已添加" : "添加「\(preset.name)」并按类别推荐软件")
+                }
+            }
+            HStack(spacing: 8) {
+                Button("从已安装软件中选择…") { showPicker = true }.glassButton(primary: true)
+                Button("+ 自定义分组") { custom.addGroup() }.glassButton()
+            }
+        }
+        group(GI.layout, "版式") {
+            HStack(spacing: 8) {
+                ForEach(CustomTemplate.allCases) { t in
+                    Text(t.rawValue).font(.system(size: 11)).foregroundStyle(t == .paper ? Color(hex: 0x2A2620) : .white)
+                        .frame(maxWidth: .infinity, minHeight: 64, alignment: .bottomLeading).padding(7)
+                        .background(thumb(t), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(custom.doc.template == t ? Theme.accentHi : Theme.line, lineWidth: custom.doc.template == t ? 2 : 0.5))
+                        .onTapGesture { custom.doc.template = t }
+                }
+            }
+            Text(custom.doc.template.blurb).font(.system(size: 11)).foregroundStyle(Theme.text2)
+        }
+    }
+
     private var backgroundPicker: some View {
         Group {
             switch bgTab {
             case 0:
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                    bgThumb(id: "default", name: "模板默认") { Rectangle().fill(thumb(custom.doc.template)) }
+                    bgThumb(id: "default", name: "版式默认") {
+                        if mode == .usage { Rectangle().fill(usageThumb(model.dataStyle.template)) } else { Rectangle().fill(thumb(custom.doc.template)) }
+                    }
                     ForEach(BuiltinBackground.all) { b in
                         bgThumb(id: "builtin:" + b.id, name: b.name) {
                             Image(nsImage: BackgroundStore.builtin(b.id) ?? NSImage()).resizable().scaledToFill()
@@ -268,7 +407,8 @@ struct CustomShareView: View {
     }
 
     private func png() -> Data? {
-        ShareRenderer.png(CustomShareCardView(doc: custom.doc, groups: groups))
+        if mode == .usage { return ShareRenderer.png(style: usageStyle, data: usageData) }
+        return ShareRenderer.png(CustomShareCardView(doc: custom.doc, groups: groups))
     }
 
     private func copy() {
@@ -282,7 +422,8 @@ struct CustomShareView: View {
         guard let data = png() else { return flash("生成失败") }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = (custom.doc.title.isEmpty ? "Orbit" : custom.doc.title) + ".png"
+        panel.nameFieldStringValue = mode == .usage ? "Orbit \(model.periodTitle).png"
+            : (custom.doc.title.isEmpty ? "Orbit" : custom.doc.title) + ".png"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { try data.write(to: url); flash("已保存") } catch { flash("保存失败：\(error.localizedDescription)") }
     }

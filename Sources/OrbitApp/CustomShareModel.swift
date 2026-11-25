@@ -5,6 +5,11 @@ import SwiftUI
 
 // MARK: - Document
 
+enum ShareMode: String, Codable, CaseIterable, Identifiable {
+    case usage = "数据排行", picked = "自选软件"
+    var id: String { rawValue }
+}
+
 enum CustomTemplate: String, Codable, CaseIterable, Identifiable {
     case fjord = "峡湾", glass = "玻璃", paper = "纸感", minimal = "极简"
     var id: String { rawValue }
@@ -80,6 +85,10 @@ struct CustomShareDoc: Codable, Equatable {
     /// The first-run suggestion (top used apps) has been applied; don't redo it after the user clears groups.
     var seeded = false
     var customApps: [CustomApp] = []
+    var mode: ShareMode = .usage
+    var cornerRadius = 24.0
+    /// Title override for the usage-ranking card; empty = automatic.
+    var usageTitle = ""
 
     init() {}
 
@@ -102,6 +111,9 @@ struct CustomShareDoc: Codable, Equatable {
         watermark = try c.decodeIfPresent(Bool.self, forKey: .watermark) ?? d.watermark
         seeded = try c.decodeIfPresent(Bool.self, forKey: .seeded) ?? d.seeded
         customApps = try c.decodeIfPresent([CustomApp].self, forKey: .customApps) ?? d.customApps
+        mode = try c.decodeIfPresent(ShareMode.self, forKey: .mode) ?? d.mode
+        cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
+        usageTitle = try c.decodeIfPresent(String.self, forKey: .usageTitle) ?? d.usageTitle
     }
 }
 

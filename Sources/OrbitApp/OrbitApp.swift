@@ -49,8 +49,7 @@ struct MainView: View {
                 switch model.section {
                 case .overview: OverviewView()
                 case .app: AppDetailView()
-                case .share: ShareEditorView()
-                case .custom: CustomShareView(custom: model.custom)
+                case .share: ShareHubView(custom: model.custom)
                 case .settings: SettingsView()
                 }
             }
@@ -74,8 +73,7 @@ struct SidebarView: View {
             row("年度总览", GI.trend, .overview, meta: model.summary.map { _ in model.periodTitle })
             row("单个应用", GI.stats, .app)
             sectionLabel("分享").padding(.top, 14)
-            row("生成分享图", GI.share, .share)
-            row("自定义分享", GI.megaphone, .custom)
+            row("分享图", GI.share, .share)
 
             Spacer()
             row("设置", GI.gear, .settings)
@@ -146,6 +144,7 @@ enum RenderCheck {
         for (name, section) in [("overview", AppModel.Section.overview), ("app", .app), ("share", .share), ("settings", .settings)] {
             model.hasOnboarded = true
             model.section = section
+            model.custom.doc.mode = .usage
             let r = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
             r.scale = 2
             if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
@@ -187,7 +186,8 @@ enum RenderCheck {
             }
         }
         model.hasOnboarded = true
-        model.section = .custom
+        model.section = .share
+        model.custom.doc.mode = .picked
         let ce = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
         if let cg = ce.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-custom.png"))
@@ -196,6 +196,16 @@ enum RenderCheck {
         if let cg = pk.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-picker.png"))
         }
+        // Usage ranking on a photo background (shared look), full screen.
+        model.custom.doc.mode = .usage
+        model.custom.doc.background = "builtin:fjord"
+        let us = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        us.scale = 2
+        if let cg = us.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("screen-usage-photo.png"))
+        }
+        model.custom.doc.mode = .picked
+        model.custom.doc.background = "default"
         model.custom.doc.groups = []
         let rank = model.recencyScores()
         for preset in GroupPreset.all {
