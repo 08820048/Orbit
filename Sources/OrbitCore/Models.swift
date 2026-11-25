@@ -102,3 +102,27 @@ public struct PeriodSummary: Sendable {
     /// Distinct apps used in the period.
     public var appCount: Int
 }
+
+/// How one app is used: when in the day, which weekdays, and how long each session lasts.
+public struct AppInsights: Sendable {
+    /// Seconds in each hour of the day (index 0 = 00:00–01:00, local time), summed over the period.
+    public var hourly: [TimeInterval]
+    /// Average seconds per calendar day for each weekday, Monday first (index 0 = Monday … 6 = Sunday).
+    public var weekdayAverage: [TimeInterval]
+    /// Number of foreground sessions that overlap the period.
+    public var sessionCount: Int
+    public var averageSession: TimeInterval
+    public var longestSession: TimeInterval
+
+    public var peakHour: Int? { hourly.max().flatMap { $0 > 0 ? hourly.firstIndex(of: $0) : nil } }
+    public var peakWeekday: Int? { weekdayAverage.max().flatMap { $0 > 0 ? weekdayAverage.firstIndex(of: $0) : nil } }
+
+    public init(hourly: [TimeInterval], weekdayAverage: [TimeInterval], sessionCount: Int,
+                averageSession: TimeInterval, longestSession: TimeInterval) {
+        self.hourly = hourly
+        self.weekdayAverage = weekdayAverage
+        self.sessionCount = sessionCount
+        self.averageSession = averageSession
+        self.longestSession = longestSession
+    }
+}

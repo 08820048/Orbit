@@ -54,6 +54,39 @@ public struct StatsEngine: Sendable {
         return (daily.reduce(0) { $0 + $1.seconds }, daily)
     }
 
+    /// Hour-of-day and weekday profile plus session lengths of one app over `period`.
+    /// - Parameter from: first day we have data for; days before it are not counted in the weekday averages.
+    public func appInsights(bundleID: String, sessions: [UsageSession], period: StatsPeriod, now: Date = Date(), from: Date? = nil) -> AppInsights {
+        let full = period.interval(in: calendar)
+        let window = DateInterval(start: full.start, end: max(full.start, min(full.end, now)))
+        let used = resolve(sessions, in: window).filter { $0.bundleID == bundleID }
+
+        var hourly = [TimeInterval](repeating: 0, count: 24)
+        var total: TimeInterval = 0, longest: TimeInterval = 0, count = 0
+        for s in used {
+            let secs = s.overlap(with: window)
+            guard secs > 0 else { continue }
+            count += 1; total += secs; longest = max(longest, secs)
+            var cursor = max(s.start, window.start)
+            let end = min(s.end, window.end)
+            while cursor < end {
+                let hourEnd = calendar.dateInterval(of: .hour, for: cursor)?.end ?? end
+                let sliceEnd = min(end, max(hourEnd, cursor.addingTimeInterval(1)))
+                hourly[calendar.component(.hour, from: cursor)] += sliceEnd.timeIntervalSince(cursor)
+                cursor = sliceEnd
+            }
+        }
+
+        var sums = [TimeInterval](repeating: 0, count: 7), days = [Int](repeating: 0, count: 7)
+        for d in dailyTotals(used, in: window) where from.map({ d.day >= $0 }) ?? true {
+            let index = (calendar.component(.weekday, from: d.day) + 5) % 7   // Sunday = 1 → 6, Monday = 2 → 0
+            sums[index] += d.seconds; days[index] += 1
+        }
+        let weekday = (0..<7).map { days[$0] == 0 ? 0 : sums[$0] / Double(days[$0]) }
+        return AppInsights(hourly: hourly, weekdayAverage: weekday, sessionCount: count,
+                           averageSession: count == 0 ? 0 : total / Double(count), longestSession: longest)
+    }
+
     // MARK: Internals
 
     /// Drops excluded apps and picks one source per day: Screen Time where it has data
