@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
-    enum Section: Hashable { case overview, app, share, settings }
+    enum Section: Hashable { case overview, app, share, custom, settings }
 
     enum Period: String, CaseIterable {
         case year = "年", month = "月", week = "周"
@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
     let store: HistoryStore
     let reader = ScreenTimeReader()
     let catalog = AppCatalog()
+    let custom = CustomShareModel()
     private(set) var monitor: ForegroundMonitor?
     private var sessions: [UsageSession] = []
     private var terminateObserver: NSObjectProtocol?

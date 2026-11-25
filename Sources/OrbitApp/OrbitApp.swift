@@ -50,6 +50,7 @@ struct MainView: View {
                 case .overview: OverviewView()
                 case .app: AppDetailView()
                 case .share: ShareEditorView()
+                case .custom: CustomShareView(custom: model.custom)
                 case .settings: SettingsView()
                 }
             }
@@ -74,6 +75,7 @@ struct SidebarView: View {
             row("单个应用", GI.stats, .app)
             sectionLabel("分享").padding(.top, 14)
             row("生成分享图", GI.share, .share)
+            row("自定义分享", GI.megaphone, .custom)
 
             Spacer()
             HStack(alignment: .top, spacing: 10) {
@@ -164,6 +166,44 @@ enum RenderCheck {
             try? png.write(to: dir.appendingPathComponent("screen-onboarding.png"))
         }
         model.hasOnboarded = true
+        // Custom share: real installed apps split into three groups.
+        await model.custom.loadInstalledIfNeeded()
+        print("installed apps found:", model.custom.installed.count)
+        let top = s.topApps.map(\.bundleID)
+        var doc = model.custom.doc
+        doc.groups = [ShareGroup(name: "AI 与开发", bundleIDs: Array(top.prefix(5))),
+                      ShareGroup(name: "写作与学习", bundleIDs: Array(top.dropFirst(5).prefix(4))),
+                      ShareGroup(name: "效率与系统", bundleIDs: Array(top.dropFirst(9).prefix(6)))]
+        doc.caption = "我们塑造了工具，而后工具也在塑造我们。\n—— 马歇尔·麦克卢汉"
+        model.custom.doc = doc
+        func resolved(_ d: CustomShareDoc) -> [ResolvedGroup] {
+            d.groups.map { g in ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { id in
+                let i = model.catalog.info(for: id); return ResolvedApp(id: id, name: i.name, icon: i.icon) }) }
+        }
+        for t in CustomTemplate.allCases {
+            for ratio in [CanvasRatio.landscape, .portrait] {
+                var d = doc; d.template = t; d.ratio = ratio
+                if let png = ShareRenderer.png(CustomShareCardView(doc: d, groups: resolved(d))) {
+                    try? png.write(to: dir.appendingPathComponent("custom-\(t.rawValue)-\(ratio.rawValue).png"))
+                }
+            }
+        }
+        for (name, bg) in [("builtin:sunset-sea", "sunset-sea"), ("builtin:milkyway", "milkyway"), ("solid:0F2C66", "solid-blue")] {
+            var d = doc; d.template = .fjord; d.background = name
+            if let png = ShareRenderer.png(CustomShareCardView(doc: d, groups: resolved(d))) {
+                try? png.write(to: dir.appendingPathComponent("custom-bg-\(bg).png"))
+            }
+        }
+        model.hasOnboarded = true
+        model.section = .custom
+        let ce = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        if let cg = ce.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("screen-custom.png"))
+        }
+        let pk = ImageRenderer(content: AppPickerSheet(custom: model.custom).environmentObject(model).frame(width: 900, height: 720))
+        if let cg = pk.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("screen-picker.png"))
+        }
         for kind in BackgroundKind.allCases {
             var st = ShareStyle(); st.background = kind
             if let png = ShareRenderer.png(style: st, data: data) { try? png.write(to: dir.appendingPathComponent("bg-\(kind.rawValue).png")) }

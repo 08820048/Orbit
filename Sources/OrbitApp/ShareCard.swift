@@ -310,7 +310,12 @@ enum ShareRenderer {
     /// Renders the card to PNG at 2x. Returns nil if rendering fails.
     @MainActor
     static func png(style: ShareStyle, data: ShareData, scale: CGFloat = 2) -> Data? {
-        let renderer = ImageRenderer(content: ShareCardView(style: style, data: data))
+        png(ShareCardView(style: style, data: data), scale: scale)
+    }
+
+    @MainActor
+    static func png<V: View>(_ view: V, scale: CGFloat = 2) -> Data? {
+        let renderer = ImageRenderer(content: view)
         renderer.scale = scale
         renderer.isOpaque = true
         renderer.colorMode = .nonLinear

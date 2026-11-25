@@ -29,10 +29,13 @@ public final class AppCatalog {
         let info: Info
         if let url = ws.urlForApplication(withBundleIdentifier: bundleID) {
             let bundle = Bundle(url: url)
+            // Finder's localized name first ("微信", not "WeChat"), then the bundle's own display name.
+            let finderName = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
             let name = overrides[bundleID]
+                ?? (finderName.isEmpty ? nil : finderName)
                 ?? bundle?.localizedInfoDictionary?["CFBundleDisplayName"] as? String
                 ?? bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-                ?? FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+                ?? bundleID
             info = Info(bundleID: bundleID, name: name, icon: Self.normalized(ws.icon(forFile: url.path)), isInstalled: true)
         } else {
             let fallback = bundleID.split(separator: ".").last.map(String.init) ?? bundleID

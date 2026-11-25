@@ -1,0 +1,274 @@
+import AppKit
+import Foundation
+import OrbitCore
+import SwiftUI
+
+// MARK: - Document
+
+enum CustomTemplate: String, Codable, CaseIterable, Identifiable {
+    case fjord = "峡湾", glass = "玻璃", paper = "纸感", minimal = "极简"
+    var id: String { rawValue }
+    var blurb: String {
+        switch self {
+        case .fjord: "照片背景 + 宋体标题，左侧分组名"
+        case .glass: "蓝色玻璃卡片，每个分组一块毛玻璃"
+        case .paper: "浅色纸张底，适合白天分享"
+        case .minimal: "纯黑底，不分组，只有图标阵列"
+        }
+    }
+}
+
+enum CanvasRatio: String, Codable, CaseIterable, Identifiable {
+    case landscape = "横版", square = "方形", portrait = "竖版"
+    var id: String { rawValue }
+    /// Points; exported at 2x.
+    var size: CGSize {
+        switch self {
+        case .landscape: CGSize(width: 800, height: 512)
+        case .square: CGSize(width: 640, height: 640)
+        case .portrait: CGSize(width: 640, height: 800)
+        }
+    }
+    var label: String {
+        switch self {
+        case .landscape: "25:16 · 1600×1024"
+        case .square: "1:1 · 1280×1280"
+        case .portrait: "4:5 · 1280×1600"
+        }
+    }
+}
+
+enum IconSize: String, Codable, CaseIterable, Identifiable {
+    case small = "小", medium = "中", large = "大"
+    var id: String { rawValue }
+    var points: CGFloat { self == .small ? 30 : self == .medium ? 36 : 44 }
+}
+
+enum TitleFont: String, Codable, CaseIterable, Identifiable {
+    case song = "宋体", hei = "黑体", round = "圆体"
+    var id: String { rawValue }
+    func font(_ size: CGFloat) -> Font {
+        switch self {
+        case .song: .custom("Songti SC", size: size).weight(.bold)
+        case .hei: .system(size: size, weight: .bold)
+        case .round: .system(size: size, weight: .bold, design: .rounded)
+        }
+    }
+}
+
+struct ShareGroup: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var name: String
+    var bundleIDs: [String] = []
+}
+
+struct CustomShareDoc: Codable, Equatable {
+    var title = "2026 我的 Mac 常用软件"
+    var caption = ""
+    var signature = NSFullUserName()
+    var groups: [ShareGroup] = []
+    var template: CustomTemplate = .fjord
+    var ratio: CanvasRatio = .landscape
+    /// "default" (the template's own), "builtin:<name>", "custom:<file>", "solid:<RRGGBB>"
+    var background = "default"
+    var overlay = 0.6
+    var blur = 0.0
+    var iconSize: IconSize = .medium
+    var titleFont: TitleFont = .song
+    var showNames = true
+    var watermark = true
+    /// The first-run suggestion (top used apps) has been applied; don't redo it after the user clears groups.
+    var seeded = false
+}
+
+// MARK: - Installed apps
+
+struct InstalledApp: Identifiable, Hashable {
+    let bundleID: String
+    let name: String
+    var id: String { bundleID }
+}
+
+enum InstalledApps {
+    /// Scans the usual application folders (one level of subfolders deep). Background-only helpers are skipped.
+    static func scan() -> [InstalledApp] {
+        let fm = FileManager.default
+        let roots = ["/Applications", "/Applications/Utilities", "/System/Applications",
+                     "/System/Applications/Utilities", NSHomeDirectory() + "/Applications"]
+        var seen = Set<String>()
+        var out: [InstalledApp] = []
+
+        func add(_ url: URL) {
+            guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !seen.contains(id) else { return }
+            if (bundle.object(forInfoDictionaryKey: "LSBackgroundOnly") as? Bool) == true { return }
+            if (bundle.object(forInfoDictionaryKey: "LSUIElement") as? Bool) == true { return }
+            seen.insert(id)
+            let name = (bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String)
+                ?? (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                ?? fm.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+            out.append(InstalledApp(bundleID: id, name: name))
+        }
+
+        for root in roots {
+            guard let items = try? fm.contentsOfDirectory(at: URL(fileURLWithPath: root), includingPropertiesForKeys: [.isDirectoryKey],
+                                                          options: [.skipsHiddenFiles]) else { continue }
+            for url in items {
+                if url.pathExtension == "app" { add(url); continue }
+                let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                guard isDir, let inner = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { continue }
+                for sub in inner where sub.pathExtension == "app" { add(sub) }
+            }
+        }
+        return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+}
+
+// MARK: - Backgrounds
+
+struct BuiltinBackground: Identifiable {
+    let id: String
+    let name: String
+    static let all: [BuiltinBackground] = [
+        .init(id: "fjord", name: "峡湾暮色"), .init(id: "mist-lake", name: "云雾湖山"),
+        .init(id: "dark-lake", name: "暗色湖面"), .init(id: "milkyway", name: "银河山脊"),
+        .init(id: "alps-night", name: "雪山星夜"), .init(id: "horizon", name: "海平线"),
+        .init(id: "sunset-sea", name: "红霞海面"), .init(id: "fluid-blue", name: "蓝绿流体"),
+    ]
+}
+
+enum BackgroundStore {
+    private static var cache: [String: NSImage] = [:]
+
+    static var folder: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Orbit/Backgrounds", isDirectory: true)
+    }
+
+    static func builtin(_ id: String) -> NSImage? {
+        load(key: "b:" + id) {
+            Bundle.module.url(forResource: id, withExtension: "jpg", subdirectory: "Backgrounds")
+        }
+    }
+
+    static func custom(_ file: String) -> NSImage? {
+        load(key: "c:" + file) { folder.appendingPathComponent(file) }
+    }
+
+    /// Copies a user-chosen picture into Orbit's own folder so it keeps working if the original moves.
+    static func importImage(from url: URL) throws -> String {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let name = UUID().uuidString + "." + (url.pathExtension.isEmpty ? "jpg" : url.pathExtension.lowercased())
+        try FileManager.default.copyItem(at: url, to: folder.appendingPathComponent(name))
+        return name
+    }
+
+    private static func load(key: String, url: () -> URL?) -> NSImage? {
+        if let hit = cache[key] { return hit }
+        guard let u = url(), let raw = NSImage(contentsOf: u) else { return nil }
+        let image = normalized(raw, maxWidth: 2400)
+        cache[key] = image
+        return image
+    }
+
+    /// Redraws into 8-bit sRGB (see AppCatalog.normalized: HDR/wide-gamut sources wash out exported PNGs).
+    static func normalized(_ image: NSImage, maxWidth: CGFloat) -> NSImage {
+        guard let rep = image.representations.max(by: { $0.pixelsWide < $1.pixelsWide }), rep.pixelsWide > 0 else { return image }
+        let scale = min(1, maxWidth / CGFloat(rep.pixelsWide))
+        let w = max(1, Int(CGFloat(rep.pixelsWide) * scale)), h = max(1, Int(CGFloat(rep.pixelsHigh) * scale))
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return image }
+        ctx.interpolationQuality = .high
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        image.draw(in: NSRect(x: 0, y: 0, width: w, height: h), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        guard let cg = ctx.makeImage() else { return image }
+        return NSImage(cgImage: cg, size: NSSize(width: w, height: h))
+    }
+}
+
+// MARK: - Model
+
+@MainActor
+final class CustomShareModel: ObservableObject {
+    private static let key = "orbit.customShare.v1"
+
+    @Published var doc: CustomShareDoc { didSet { if doc != oldValue { save() } } }
+    @Published var installed: [InstalledApp] = []
+    @Published var activeGroup: UUID?
+    private var scanned = false
+
+    init() {
+        if let data = UserDefaults.standard.data(forKey: Self.key),
+           let saved = try? JSONDecoder().decode(CustomShareDoc.self, from: data) {
+            doc = saved
+        } else {
+            doc = CustomShareDoc()
+        }
+        activeGroup = doc.groups.first?.id
+    }
+
+    private func save() {
+        if let data = try? JSONEncoder().encode(doc) { UserDefaults.standard.set(data, forKey: Self.key) }
+    }
+
+    func loadInstalledIfNeeded() async {
+        guard !scanned else { return }
+        scanned = true
+        installed = await Task.detached(priority: .userInitiated) { InstalledApps.scan() }.value
+    }
+
+    /// First run: put the user's most-used apps into one group so the card is never empty.
+    func seedIfNeeded(topBundleIDs: [String]) {
+        guard !doc.seeded else { return }
+        doc.seeded = true
+        guard doc.groups.isEmpty, !topBundleIDs.isEmpty else { return }
+        let group = ShareGroup(name: "常用软件", bundleIDs: Array(topBundleIDs.prefix(12)))
+        doc.groups = [group]
+        activeGroup = group.id
+    }
+
+    var totalApps: Int { doc.groups.reduce(0) { $0 + $1.bundleIDs.count } }
+
+    // MARK: Groups
+
+    func addGroup() {
+        let group = ShareGroup(name: "分组 \(doc.groups.count + 1)")
+        doc.groups.append(group)
+        activeGroup = group.id
+    }
+
+    func removeGroup(_ id: UUID) {
+        doc.groups.removeAll { $0.id == id }
+        if activeGroup == id { activeGroup = doc.groups.first?.id }
+    }
+
+    func moveGroup(_ id: UUID, by offset: Int) {
+        guard let i = doc.groups.firstIndex(where: { $0.id == id }) else { return }
+        let j = i + offset
+        guard doc.groups.indices.contains(j) else { return }
+        doc.groups.swapAt(i, j)
+    }
+
+    func rename(_ id: UUID, to name: String) {
+        guard let i = doc.groups.firstIndex(where: { $0.id == id }) else { return }
+        doc.groups[i].name = name
+    }
+
+    /// Selecting an app that is in another group moves it here; selecting one that is already here removes it.
+    func toggle(_ bundleID: String, in groupID: UUID) {
+        guard let target = doc.groups.firstIndex(where: { $0.id == groupID }) else { return }
+        if doc.groups[target].bundleIDs.contains(bundleID) {
+            doc.groups[target].bundleIDs.removeAll { $0 == bundleID }
+            return
+        }
+        for i in doc.groups.indices { doc.groups[i].bundleIDs.removeAll { $0 == bundleID } }
+        doc.groups[target].bundleIDs.append(bundleID)
+    }
+
+    func groupName(containing bundleID: String) -> String? {
+        doc.groups.first { $0.bundleIDs.contains(bundleID) }?.name
+    }
+}
