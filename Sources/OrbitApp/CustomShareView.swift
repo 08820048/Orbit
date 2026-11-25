@@ -52,7 +52,7 @@ struct ShareHubView: View {
         // The inspector runs the full window height; title and export actions sit above the preview only.
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                ScreenHeader(title: "分享图") {
+                ScreenHeader(title: "分享图", compact: true) {
                     Text(mode == .usage
                          ? "\(model.periodTitle) · Top \(model.dataStyle.topN)"
                          : "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件")
@@ -67,6 +67,7 @@ struct ShareHubView: View {
             }
             inspector.frame(width: 340)
         }
+        .ignoresSafeArea(.container, edges: .top)
         .overlay(alignment: .top) {
             if let toast {
                 Text(toast).font(.system(size: 12, weight: .medium)).padding(.horizontal, 14).frame(height: 32)

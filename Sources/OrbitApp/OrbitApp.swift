@@ -111,6 +111,8 @@ struct SidebarView: View {
 /// Header bar shared by the main screens.
 struct ScreenHeader<Trailing: View>: View {
     let title: String
+    /// Sits in the window's top strip (the content must ignore the top safe area) instead of below it.
+    var compact = false
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
@@ -119,7 +121,7 @@ struct ScreenHeader<Trailing: View>: View {
             Spacer()
             trailing
         }
-        .padding(.horizontal, 24).padding(.top, 14).frame(height: 62, alignment: .center)
+        .padding(.horizontal, 24).padding(.top, compact ? 0 : 14).frame(height: compact ? 48 : 62, alignment: .center)
     }
 }
 
