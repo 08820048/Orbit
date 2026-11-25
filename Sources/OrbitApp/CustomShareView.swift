@@ -9,10 +9,6 @@ struct CustomShareView: View {
     @State private var toast: String?
     @State private var bgTab = 0   // 0 built-in, 1 my picture, 2 solid
 
-    private var usageRank: [String: Int] {
-        Dictionary(uniqueKeysWithValues: (model.summary?.topApps ?? []).enumerated().map { ($1.bundleID, $0) })
-    }
-
     private var groups: [ResolvedGroup] {
         custom.doc.groups.map { g in
             ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { id in
@@ -46,7 +42,7 @@ struct CustomShareView: View {
         .sheet(isPresented: $showPicker) { AppPickerSheet(custom: custom).environmentObject(model) }
         .task {
             await custom.loadInstalledIfNeeded()
-            custom.seedIfNeeded(topBundleIDs: (model.summary?.topApps ?? []).map(\.bundleID))
+            custom.seedIfNeeded(scores: model.recencyScores())
         }
     }
 
@@ -116,7 +112,7 @@ struct CustomShareView: View {
                         ForEach(GroupPreset.all) { preset in
                             let added = custom.hasGroup(named: preset.name)
                             PresetChip(name: preset.name, added: added)
-                                .onTapGesture { if !added { withAnimation { custom.addPreset(preset, usageRank: usageRank) } } }
+                                .onTapGesture { if !added { withAnimation { custom.addPreset(preset, scores: model.recencyScores()) } } }
                                 .help(added ? "已添加" : "添加「\(preset.name)」并按类别推荐软件")
                         }
                     }

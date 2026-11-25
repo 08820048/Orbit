@@ -198,9 +198,9 @@ enum RenderCheck {
             try? png.write(to: dir.appendingPathComponent("screen-picker.png"))
         }
         model.custom.doc.groups = []
-        let rank = Dictionary(uniqueKeysWithValues: s.topApps.enumerated().map { ($1.bundleID, $0) })
+        let rank = model.recencyScores()
         for preset in GroupPreset.all {
-            model.custom.addPreset(preset, usageRank: rank)
+            model.custom.addPreset(preset, scores: rank)
             let g = model.custom.doc.groups.last!
             print("preset", preset.name, "->", g.bundleIDs.map { model.catalog.info(for: $0).name }.joined(separator: ", "))
         }

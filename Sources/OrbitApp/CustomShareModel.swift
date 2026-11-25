@@ -224,12 +224,14 @@ final class CustomShareModel: ObservableObject {
         installed = await Task.detached(priority: .userInitiated) { InstalledApps.scan() }.value
     }
 
-    /// First run: put the user's most-used apps into one group so the card is never empty.
-    func seedIfNeeded(topBundleIDs: [String]) {
+    /// First run: put the user's most-used (recently) apps into one group so the card is never empty.
+    func seedIfNeeded(scores: [String: Double]) {
         guard !doc.seeded else { return }
         doc.seeded = true
-        guard doc.groups.isEmpty, !topBundleIDs.isEmpty else { return }
-        let group = ShareGroup(name: "常用软件", bundleIDs: Array(topBundleIDs.prefix(12)))
+        guard doc.groups.isEmpty, !installed.isEmpty else { return }
+        let top = AppRecommender.pick(from: installed.filter(AppRecommender.isRecommendable), scores: scores, limit: 12, minimum: 0)
+        guard !top.isEmpty else { return }
+        let group = ShareGroup(name: "常用软件", bundleIDs: top.map(\.bundleID))
         doc.groups = [group]
         activeGroup = group.id
     }
@@ -279,22 +281,13 @@ final class CustomShareModel: ObservableObject {
 
     func hasGroup(named name: String) -> Bool { doc.groups.contains { $0.name == name } }
 
-    /// Adds a built-in group and fills it with installed apps that fit it (most-used first, at most 6).
-    /// `usageRank` maps bundle id → position in the usage ranking (0 = most used).
-    func addPreset(_ preset: GroupPreset, usageRank: [String: Int]) {
+    /// Adds a built-in group and fills it with installed apps that fit it, best recent usage first (at most 6).
+    /// `scores` is `AppRecommender.recencyScores`. System tools are never recommended.
+    func addPreset(_ preset: GroupPreset, scores: [String: Double]) {
         guard !hasGroup(named: preset.name) else { return }
         let taken = Set(doc.groups.flatMap(\.bundleIDs))
-        let picks = installed
-            .filter { !taken.contains($0.bundleID) && preset.fits($0) }
-            .sorted { a, b in
-                switch (usageRank[a.bundleID], usageRank[b.bundleID]) {
-                case let (x?, y?): return x < y
-                case (_?, nil): return true
-                case (nil, _?): return false
-                default: return a.name.localizedStandardCompare(b.name) == .orderedAscending
-                }
-            }
-            .prefix(6).map(\.bundleID)
+        let candidates = installed.filter { !taken.contains($0.bundleID) && AppRecommender.isRecommendable($0) && preset.fits($0) }
+        let picks = AppRecommender.pick(from: candidates, scores: scores, limit: 6).map(\.bundleID)
         let group = ShareGroup(name: preset.name, bundleIDs: Array(picks))
         doc.groups.append(group)
         activeGroup = group.id

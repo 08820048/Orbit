@@ -127,6 +127,16 @@ final class AppModel: ObservableObject {
         return (d.total, d.daily.filter { $0.day >= start })
     }
 
+    /// Recency-weighted usage over the last 30 days, for recommending apps (independent of the selected period).
+    func recencyScores() -> [String: Double] {
+        let now = Date()
+        let from = now.addingTimeInterval(-30 * 86_400)
+        let sessions = (try? store.sessions(overlapping: DateInterval(start: from, end: now))) ?? []
+        let hidden = (try? store.hiddenBundleIDs()) ?? []
+        let excluded = StatsEngine.defaultExcluded.union(hidden)
+        return AppRecommender.recencyScores(sessions.filter { !excluded.contains($0.bundleID) }, now: now)
+    }
+
     func eraseAllData() {
         try? store.eraseAll()
         selectedApp = nil
