@@ -4,7 +4,6 @@ import SwiftUI
 /// First-launch flow: get Full Disk Access, or fall back to recording from today.
 struct OnboardingView: View {
     @EnvironmentObject var model: AppModel
-    private let timer = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -12,7 +11,13 @@ struct OnboardingView: View {
             right.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 860, minHeight: 580)
-        .onReceive(timer) { _ in model.checkAccess() }
+        .task {
+            // Poll while this screen is showing; cancelled automatically when onboarding ends.
+            while !Task.isCancelled {
+                model.checkAccess()
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.checkAccess()
         }

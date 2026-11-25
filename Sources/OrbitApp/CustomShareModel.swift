@@ -86,6 +86,8 @@ struct CustomShareDoc: Codable, Equatable {
 struct InstalledApp: Identifiable, Hashable {
     let bundleID: String
     let name: String
+    /// Mac App Store category without the "public.app-category." prefix ("developer-tools"), or "".
+    var category = ""
     var id: String { bundleID }
 }
 
@@ -106,7 +108,9 @@ enum InstalledApps {
             let name = (bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String)
                 ?? (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                 ?? fm.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-            out.append(InstalledApp(bundleID: id, name: name))
+            let category = ((bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String) ?? "")
+                .replacingOccurrences(of: "public.app-category.", with: "").lowercased()
+            out.append(InstalledApp(bundleID: id, name: name, category: category))
         }
 
         for root in roots {
@@ -266,6 +270,41 @@ final class CustomShareModel: ObservableObject {
         }
         for i in doc.groups.indices { doc.groups[i].bundleIDs.removeAll { $0 == bundleID } }
         doc.groups[target].bundleIDs.append(bundleID)
+    }
+
+    // MARK: Presets
+
+    /// Shown under the groups after a preset was added ("recommended 5 apps…"); clears itself.
+    @Published var presetNote: String?
+
+    func hasGroup(named name: String) -> Bool { doc.groups.contains { $0.name == name } }
+
+    /// Adds a built-in group and fills it with installed apps that fit it (most-used first, at most 6).
+    /// `usageRank` maps bundle id → position in the usage ranking (0 = most used).
+    func addPreset(_ preset: GroupPreset, usageRank: [String: Int]) {
+        guard !hasGroup(named: preset.name) else { return }
+        let taken = Set(doc.groups.flatMap(\.bundleIDs))
+        let picks = installed
+            .filter { !taken.contains($0.bundleID) && preset.fits($0) }
+            .sorted { a, b in
+                switch (usageRank[a.bundleID], usageRank[b.bundleID]) {
+                case let (x?, y?): return x < y
+                case (_?, nil): return true
+                case (nil, _?): return false
+                default: return a.name.localizedStandardCompare(b.name) == .orderedAscending
+                }
+            }
+            .prefix(6).map(\.bundleID)
+        let group = ShareGroup(name: preset.name, bundleIDs: Array(picks))
+        doc.groups.append(group)
+        activeGroup = group.id
+        presetNote = picks.isEmpty
+            ? "没有找到适合「\(preset.name)」的已安装软件，请点「从已安装软件中选择」手动添加。"
+            : "已按软件类别为「\(preset.name)」推荐了 \(picks.count) 个，可在「选择软件」里增减。"
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            self?.presetNote = nil
+        }
     }
 
     func groupName(containing bundleID: String) -> String? {

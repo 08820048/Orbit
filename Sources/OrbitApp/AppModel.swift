@@ -85,7 +85,7 @@ final class AppModel: ObservableObject {
         if access == .granted {
             let reader = reader, store = store
             do {
-                try await Task.detached(priority: .userInitiated) {
+                _ = try await Task.detached(priority: .userInitiated) {
                     try Importer(reader: reader, store: store).importScreenTime()
                 }.value
                 lastError = nil

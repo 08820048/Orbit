@@ -54,7 +54,7 @@ struct ShareEditorView: View {
             let s = min((geo.size.width - 80) / size.width, (geo.size.height - 90) / size.height, 1)
             ZStack {
                 if data.isEmpty {
-                    EmptyStateView()
+                    EmptyStateView().frame(width: geo.size.width, height: geo.size.height)
                 } else {
                     ShareCardView(style: style, data: data)
                         .scaleEffect(s, anchor: .center)

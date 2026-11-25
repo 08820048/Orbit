@@ -27,7 +27,7 @@ struct AppDetailView: View {
                 ForEach(s.topApps) { app in
                     let info = model.catalog.info(for: app.bundleID)
                     HStack(spacing: 10) {
-                        Image(nsImage: info.icon).resizable().frame(width: 26, height: 26)
+                        SharpIcon(info.icon, 26)
                         Text(info.name).font(.system(size: 13)).lineLimit(1)
                         Spacer()
                         Text(Fmt.short(app.seconds)).font(.system(size: 11)).monospacedDigit().foregroundStyle(Theme.text2)
@@ -55,7 +55,7 @@ struct AppDetailView: View {
             OScroll {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 16) {
-                        Image(nsImage: info.icon).resizable().frame(width: 64, height: 64)
+                        SharpIcon(info.icon, 64)
                             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(info.name).font(.system(size: 26, weight: .bold))

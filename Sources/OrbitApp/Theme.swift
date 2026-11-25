@@ -65,9 +65,7 @@ struct GlassIcon: View {
     var size: CGFloat = 28
 
     var body: some View {
-        Image(nsImage: GlassIcons.image(index))
-            .resizable().interpolation(.high)
-            .frame(width: size, height: size)
+        SharpIcon(GlassIcons.image(index), size)
             .shadow(color: Color(hex: 0x0A3CAA, opacity: 0.28), radius: size * 0.12, y: size * 0.08)
             .accessibilityHidden(true)
     }

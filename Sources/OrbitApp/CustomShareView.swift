@@ -9,6 +9,10 @@ struct CustomShareView: View {
     @State private var toast: String?
     @State private var bgTab = 0   // 0 built-in, 1 my picture, 2 solid
 
+    private var usageRank: [String: Int] {
+        Dictionary(uniqueKeysWithValues: (model.summary?.topApps ?? []).enumerated().map { ($1.bundleID, $0) })
+    }
+
     private var groups: [ResolvedGroup] {
         custom.doc.groups.map { g in
             ResolvedGroup(id: g.id, name: g.name, apps: g.bundleIDs.map { id in
@@ -59,8 +63,11 @@ struct CustomShareView: View {
                         Text("还没有选择软件").font(.system(size: 18, weight: .bold))
                         Text("从这台 Mac 已安装的软件里挑出你想展示的，分组后生成分享图。")
                             .font(.system(size: 13)).foregroundStyle(Theme.text2)
+                            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                         Button("从已安装软件中选择…") { showPicker = true }.glassButton(primary: true)
                     }
+                    .padding(.horizontal, 40)
+                    .frame(width: geo.size.width, height: geo.size.height)
                 } else {
                     CustomShareCardView(doc: custom.doc, groups: groups)
                         .scaleEffect(s)
@@ -88,10 +95,34 @@ struct CustomShareView: View {
                     field("署名") { TextField("署名", text: $custom.doc.signature) }
                 }
                 group(GI.stats, "软件与分组") {
+                    if custom.doc.groups.isEmpty {
+                        Text("还没有分组").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                            .frame(maxWidth: .infinity).padding(.vertical, 14)
+                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
+                    }
                     ForEach(custom.doc.groups) { g in groupRow(g) }
+                    if let note = custom.presetNote {
+                        HStack(alignment: .top, spacing: 8) {
+                            GlassIcon(index: GI.shield, size: 18)
+                            Text(note).font(.system(size: 11)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 11).padding(.vertical, 9).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.accentHi.opacity(0.4), lineWidth: 0.5))
+                        .transition(.opacity)
+                    }
+                    Text("快速添加常用分组").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                    FlowLayout(spacing: 7) {
+                        ForEach(GroupPreset.all) { preset in
+                            let added = custom.hasGroup(named: preset.name)
+                            PresetChip(name: preset.name, added: added)
+                                .onTapGesture { if !added { withAnimation { custom.addPreset(preset, usageRank: usageRank) } } }
+                                .help(added ? "已添加" : "添加「\(preset.name)」并按类别推荐软件")
+                        }
+                    }
                     HStack(spacing: 8) {
                         Button("从已安装软件中选择…") { showPicker = true }.glassButton(primary: true)
-                        Button("+ 分组") { custom.addGroup() }.glassButton()
+                        Button("+ 自定义分组") { custom.addGroup() }.glassButton()
                     }
                 }
                 group(GI.layout, "模板风格") {
@@ -354,7 +385,7 @@ struct AppPickerSheet: View {
         let inActive = custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs.contains(app.bundleID) ?? false
         let other = owner != nil && !inActive
         return VStack(spacing: 6) {
-            Image(nsImage: info.icon).resizable().frame(width: 48, height: 48)
+            SharpIcon(info.icon, 48)
                 .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
             Text(app.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
             Text(owner ?? " ").font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)

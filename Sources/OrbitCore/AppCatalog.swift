@@ -48,7 +48,7 @@ public final class AppCatalog {
 
     /// Rasterizes a system icon into plain 8-bit sRGB. System icons can carry HDR / wide-gamut data that
     /// makes SwiftUI render whole share cards in an HDR color space, which exports as washed-out PNGs.
-    static func normalized(_ image: NSImage, pixels: Int = 256) -> NSImage {
+    static func normalized(_ image: NSImage, pixels: Int = 512) -> NSImage {
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
@@ -60,6 +60,6 @@ public final class AppCatalog {
         image.draw(in: NSRect(x: 0, y: 0, width: pixels, height: pixels), from: .zero, operation: .sourceOver, fraction: 1)
         NSGraphicsContext.restoreGraphicsState()
         guard let cg = ctx.makeImage() else { return image }
-        return NSImage(cgImage: cg, size: NSSize(width: 128, height: 128))
+        return NSImage(cgImage: cg, size: NSSize(width: 256, height: 256))
     }
 }

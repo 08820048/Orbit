@@ -114,7 +114,7 @@ struct TopAppsPanel: View {
                 HStack(spacing: 14) {
                     Text(String(format: "%02d", item.offset + 1)).font(.system(size: 12)).monospacedDigit()
                         .foregroundStyle(Theme.text2).frame(width: 22, alignment: .trailing)
-                    Image(nsImage: info.icon).resizable().frame(width: 34, height: 34)
+                    SharpIcon(info.icon, 34)
                     VStack(spacing: 7) {
                         HStack {
                             Text(info.name).font(.system(size: 13, weight: .medium)).lineLimit(1)

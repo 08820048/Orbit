@@ -162,7 +162,7 @@ struct ShareCardView: View {
     }
 
     private func entryIcon(_ e: ShareEntry, _ size: CGFloat) -> some View {
-        Image(nsImage: e.icon).resizable().frame(width: size, height: size)
+        SharpIcon(e.icon, size)
             .shadow(color: .black.opacity(0.35), radius: size * 0.2, y: size * 0.1)
     }
 
@@ -213,7 +213,7 @@ struct ShareCardView: View {
         return VStack(spacing: 0) {
             kicker("ORBIT / \(data.periodTitle.uppercased()) · 陪伴").padding(.top, 44)
             if let top {
-                Image(nsImage: top.icon).resizable().frame(width: 132, height: 132)
+                SharpIcon(top.icon, 132)
                     .shadow(color: style.accentValue.lo.opacity(0.7), radius: 36)
                     .shadow(color: .black.opacity(0.5), radius: 20, y: 18)
                     .padding(.top, 40)

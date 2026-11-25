@@ -111,7 +111,7 @@ struct CustomShareCardView: View {
 
     private func tile(_ app: ResolvedApp, cellW: CGFloat) -> some View {
         VStack(spacing: 7) {
-            Image(nsImage: app.icon).resizable().interpolation(.high).frame(width: icon, height: icon)
+            SharpIcon(app.icon, icon)
                 .shadow(color: .black.opacity(lightSurface ? 0.22 : 0.5), radius: icon * 0.22, y: icon * 0.14)
             if doc.showNames {
                 Text(app.name).font(.system(size: 10.5)).tracking(0.2).lineLimit(2).multilineTextAlignment(.center)

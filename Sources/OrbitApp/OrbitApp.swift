@@ -78,14 +78,6 @@ struct SidebarView: View {
             row("自定义分享", GI.megaphone, .custom)
 
             Spacer()
-            HStack(alignment: .top, spacing: 10) {
-                GlassIcon(index: GI.shield, size: 28)
-                Text("数据来源：屏幕使用时间\n\(model.coverageText)\n仅存于本机，不上传")
-                    .font(.system(size: 11)).foregroundStyle(Theme.text2).lineSpacing(3)
-            }
-            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            .glassPanel(radius: 14)
-            .padding(.horizontal, 4).padding(.bottom, 8)
             row("设置", GI.gear, .settings)
         }
         .padding(.horizontal, 10).padding(.bottom, 16)
@@ -155,7 +147,7 @@ enum RenderCheck {
             model.hasOnboarded = true
             model.section = section
             let r = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
-            r.scale = 1
+            r.scale = 2
             if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
                 try? png.write(to: dir.appendingPathComponent("screen-\(name).png"))
             }
@@ -170,6 +162,7 @@ enum RenderCheck {
         await model.custom.loadInstalledIfNeeded()
         print("installed apps found:", model.custom.installed.count)
         let top = s.topApps.map(\.bundleID)
+        let originalCustomDoc = model.custom.doc   // restored at the end: the check must not touch real settings
         var doc = model.custom.doc
         doc.groups = [ShareGroup(name: "AI 与开发", bundleIDs: Array(top.prefix(5))),
                       ShareGroup(name: "写作与学习", bundleIDs: Array(top.dropFirst(5).prefix(4))),
@@ -204,6 +197,24 @@ enum RenderCheck {
         if let cg = pk.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-picker.png"))
         }
+        model.custom.doc.groups = []
+        let rank = Dictionary(uniqueKeysWithValues: s.topApps.enumerated().map { ($1.bundleID, $0) })
+        for preset in GroupPreset.all {
+            model.custom.addPreset(preset, usageRank: rank)
+            let g = model.custom.doc.groups.last!
+            print("preset", preset.name, "->", g.bundleIDs.map { model.catalog.info(for: $0).name }.joined(separator: ", "))
+        }
+        let presetShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 1200).environment(\.colorScheme, .dark))
+        presetShot.scale = 1
+        if let cg = presetShot.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("screen-presets.png"))
+        }
+        model.custom.doc.groups = []
+        let emptyShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        if let cg = emptyShot.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("screen-custom-empty.png"))
+        }
+        model.custom.doc = originalCustomDoc
         for kind in BackgroundKind.allCases {
             var st = ShareStyle(); st.background = kind
             if let png = ShareRenderer.png(style: st, data: data) { try? png.write(to: dir.appendingPathComponent("bg-\(kind.rawValue).png")) }
