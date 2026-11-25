@@ -225,6 +225,8 @@ final class CustomShareModel: ObservableObject {
 
     @Published var doc: CustomShareDoc { didSet { if doc != oldValue { save() } } }
     @Published var installed: [InstalledApp] = []
+    /// Known command-line products found on this Mac.
+    @Published var detectedTools: [TerminalTool] = []
     @Published var activeGroup: UUID?
     private var scanned = false
 
@@ -246,6 +248,7 @@ final class CustomShareModel: ObservableObject {
         guard !scanned else { return }
         scanned = true
         installed = await Task.detached(priority: .userInitiated) { InstalledApps.scan() }.value
+        detectedTools = await Task.detached(priority: .userInitiated) { TerminalCatalog.detect() }.value
     }
 
     /// First run: put the user's most-used (recently) apps into one group so the card is never empty.
@@ -305,6 +308,24 @@ final class CustomShareModel: ObservableObject {
     func addCustom(_ app: CustomApp, to group: UUID?) {
         doc.customApps.append(app)
         if let group { toggle(app.key, in: group) }
+    }
+
+    /// The custom entry created for a catalog tool, if the user already used it.
+    func brandApp(for tool: TerminalTool) -> CustomApp? {
+        doc.customApps.first { $0.brand == tool.id && $0.iconFile == nil }
+    }
+
+    /// Tools shown in the picker: found on this Mac, plus ones added earlier (even if since uninstalled).
+    var terminalTools: [TerminalTool] {
+        var list = detectedTools
+        for app in doc.customApps {
+            if let id = app.brand, app.iconFile == nil, let tool = TerminalCatalog.tool(id: id), !list.contains(tool) { list.append(tool) }
+        }
+        return list
+    }
+
+    func toggleTool(_ tool: TerminalTool, in group: UUID) {
+        if let app = brandApp(for: tool) { toggle(app.key, in: group) } else { addCustom(CustomApp.from(tool), to: group) }
     }
 
     func updateCustom(_ app: CustomApp) {

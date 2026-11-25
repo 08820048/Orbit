@@ -314,7 +314,7 @@ struct AppPickerSheet: View {
 
     private var items: [PickItem] {
         let activeIDs = Set(custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs ?? [])
-        var customs = custom.doc.customApps.map { PickItem(id: $0.key, name: $0.name, custom: $0) }
+        var customs = custom.doc.customApps.filter { $0.brand == nil || $0.iconFile != nil }.map { PickItem(id: $0.key, name: $0.name, custom: $0) }
         var installed = custom.installed.map { PickItem(id: $0.bundleID, name: $0.name, custom: nil) }
         switch filter {
         case 1:
@@ -368,7 +368,21 @@ struct AppPickerSheet: View {
                         if filter == 0 && query.isEmpty { addTile }
                         ForEach(items) { item in tile(item) }
                     }
-                    .padding(.vertical, 16)
+                    .padding(.top, 16)
+                    if !visibleTools.isEmpty {
+                        HStack(spacing: 8) {
+                            GlassIcon(index: 2, size: 20)
+                            Text("检测到的终端工具").font(.system(size: 13, weight: .semibold))
+                            Text(custom.detectedTools.isEmpty ? "还没有在命令行里找到" : "在这台 Mac 的命令行里找到 \(custom.detectedTools.count) 个")
+                                .font(.system(size: 11)).foregroundStyle(Theme.text2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 18)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
+                            ForEach(visibleTools) { tool in toolTile(tool) }
+                        }
+                        .padding(.top, 10)
+                    }
+                    Color.clear.frame(height: 16)
                 }
             }
             HStack(spacing: 12) {
@@ -386,6 +400,43 @@ struct AppPickerSheet: View {
         .sheet(item: $editing) { app in
             CustomAppSheet(custom: custom, draft: app, isNew: editingIsNew)
         }
+    }
+
+    private var visibleTools: [TerminalTool] {
+        guard filter != 1 else { return [] }
+        let activeIDs = Set(custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs ?? [])
+        var tools = custom.terminalTools
+        if filter == 2 { tools = tools.filter { t in custom.brandApp(for: t).map { activeIDs.contains($0.key) } ?? false } }
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        if !q.isEmpty { tools = tools.filter { $0.name.lowercased().contains(q) || $0.commands.contains { $0.contains(q) } } }
+        return tools
+    }
+
+    private func toolTile(_ tool: TerminalTool) -> some View {
+        let app = custom.brandApp(for: tool)
+        let owner = app.flatMap { custom.groupName(containing: $0.key) }
+        let inActive = app.map { custom.doc.groups.first { $0.id == custom.activeGroup }?.bundleIDs.contains($0.key) ?? false } ?? false
+        let other = owner != nil && !inActive
+        let detected = custom.detectedTools.contains(tool)
+        return VStack(spacing: 5) {
+            SharpIcon(CustomAppIcons.render(CustomApp.from(tool)), 48).shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+            Text(tool.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+            Text(TerminalCatalog.command(for: tool)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.text2).lineLimit(1)
+            Text(owner ?? (detected ? "终端 · 已检测" : "终端 · 已添加")).font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)
+        }
+        .padding(.horizontal, 6).padding(.top, 13).padding(.bottom, 9).frame(maxWidth: .infinity)
+        .opacity(other ? 0.55 : 1)
+        .background(inActive ? Theme.accent.opacity(0.16) : Theme.panel, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .strokeBorder(inActive ? Theme.accentHi : Theme.line, lineWidth: inActive ? 1.5 : 0.5))
+        .overlay(alignment: .topTrailing) {
+            if inActive {
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 17, height: 17).background(Circle().fill(Theme.accentGradient)).padding(7)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { if let g = custom.activeGroup { custom.toggleTool(tool, in: g) } }
     }
 
     private var addTile: some View {
@@ -459,6 +510,22 @@ struct CustomAppSheet: View {
         _groupID = State(initialValue: custom.activeGroup)
     }
 
+    private var suggestions: [TerminalTool] {
+        // Hide once a catalog tool has been applied (name equals it) so the list doesn't linger.
+        if let id = draft.brand, let tool = TerminalCatalog.tool(id: id), tool.name == draft.name { return [] }
+        return TerminalCatalog.match(draft.name)
+    }
+
+    private func apply(_ tool: TerminalTool) {
+        draft.name = tool.name
+        draft.brand = tool.id
+        draft.squircle = tool.tileHex != nil
+        draft.colorHex = tool.tileHex ?? "FFFFFF"
+        draft.iconFile = nil
+        pending = nil
+        error = nil
+    }
+
     private static let swatches = ["D97757", "1A1D24", "F5F5F2", "2F6BEA", "2E9B6A", "7B5CE0"]
     private var canAdd: Bool { !draft.name.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -487,17 +554,34 @@ struct CustomAppSheet: View {
                     .onDrop(of: [.fileURL, .image], isTargeted: $targeted) { providers in load(providers) }
                     Button("选择图片…") { choose() }.glassButton()
                     Button("粘贴剪贴板图片") { paste() }.glassButton()
-                    if draft.iconFile != nil || pending != nil {
-                        Button("移除图片") { pending = nil; draft.iconFile = nil }.buttonStyle(.plain).focusable(false)
+                    if draft.iconFile != nil || pending != nil || draft.brand != nil {
+                        Button("移除图片 / logo") { pending = nil; draft.iconFile = nil; draft.brand = nil }.buttonStyle(.plain).focusable(false)
                             .font(.system(size: 11)).foregroundStyle(Theme.text2)
                     }
                 }
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
                         label("名称")
-                        TextField("例如 Claude Code", text: $draft.name).textFieldStyle(.plain).font(.system(size: 13))
+                        TextField("例如 Claude Code、Gemini CLI", text: $draft.name).textFieldStyle(.plain).font(.system(size: 13))
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .background(Theme.control, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        if !suggestions.isEmpty {
+                            VStack(spacing: 2) {
+                                ForEach(suggestions) { tool in
+                                    HStack(spacing: 10) {
+                                        SharpIcon(CustomAppIcons.render(CustomApp.from(tool)), 28)
+                                        Text(tool.name).font(.system(size: 13, weight: .medium))
+                                        Spacer()
+                                        Text(TerminalCatalog.command(for: tool)).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.text2)
+                                    }
+                                    .padding(.horizontal, 8).padding(.vertical, 5).contentShape(Rectangle())
+                                    .onTapGesture { apply(tool) }
+                                }
+                            }
+                            .padding(4).background(Theme.sidebar, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.line, lineWidth: 0.5))
+                            Text("点一下自动填好名称和 logo").font(.system(size: 10)).foregroundStyle(Theme.text2)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 5) {
                         label("图标样式")
@@ -536,7 +620,7 @@ struct CustomAppSheet: View {
                     .keyboardShortcut(.defaultAction).disabled(!canAdd)
             }
         }
-        .padding(24).frame(width: 560, height: 420)
+        .padding(24).frame(width: 560, height: 520)
         .background(WindowBackground())
         .foregroundStyle(Theme.text)
     }
@@ -579,11 +663,19 @@ struct CustomAppSheet: View {
         guard let image, image.isValid else { error = "没有读到可用的图片，请换一张（PNG / JPG / HEIC / SVG）。"; return }
         error = nil
         pending = image
+        draft.brand = nil   // the user's own picture wins over a catalog logo
     }
 
     private func commit() {
         var app = draft
         app.name = app.name.trimmingCharacters(in: .whitespaces)
+        // Typed a known name exactly and gave no picture: use its logo.
+        if app.brand == nil, pending == nil, app.iconFile == nil,
+           let tool = TerminalCatalog.match(app.name, limit: 1).first,
+           ([tool.name.lowercased()] + tool.aliases.map({ $0.lowercased() }) + tool.commands).contains(app.name.lowercased()) {
+            let a = CustomApp.from(tool)
+            app.brand = a.brand; app.squircle = a.squircle; app.colorHex = a.colorHex
+        }
         do {
             if let pending {
                 CustomAppIcons.delete(file: custom.customApp(forKey: app.key)?.iconFile)

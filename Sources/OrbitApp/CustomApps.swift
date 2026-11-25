@@ -10,6 +10,12 @@ struct CustomApp: Codable, Identifiable, Equatable {
     /// true: round-rect "app icon" (square art is cropped, transparent logos sit on `colorHex`); false: keep as is.
     var squircle = true
     var colorHex = "D97757"
+    /// `TerminalCatalog` id: the icon is the bundled brand logo (when no picture was chosen).
+    var brand: String?
+
+    static func from(_ tool: TerminalTool) -> CustomApp {
+        CustomApp(name: tool.name, iconFile: nil, squircle: tool.tileHex != nil, colorHex: tool.tileHex ?? "FFFFFF", brand: tool.id)
+    }
 
     /// How it is referenced from a group's `bundleIDs`.
     var key: String { Self.prefix + id.uuidString }
@@ -49,9 +55,14 @@ enum CustomAppIcons {
 
     /// The finished icon (512 px, sRGB). `image` overrides the stored file (live preview in the editor).
     static func render(_ app: CustomApp, image override: NSImage? = nil) -> NSImage {
-        let key = "\(app.id)|\(app.iconFile ?? "-")|\(app.squircle)|\(app.colorHex)|\(app.name.prefix(1))"
+        // Brand icons are shared by every entry of the same tool; others are keyed per entry.
+        let hasOwnPicture = app.iconFile != nil
+        let key = (app.brand != nil && !hasOwnPicture)
+            ? "brand|\(app.brand!)|\(app.squircle)|\(app.colorHex)"
+            : "\(app.id)|\(app.iconFile ?? "-")|\(app.squircle)|\(app.colorHex)|\(app.name.prefix(1))"
         if override == nil, let hit = cache[key] { return hit }
-        let source = override ?? loadFile(app.iconFile)
+        let brandLogo = (!hasOwnPicture ? app.brand.flatMap(TerminalCatalog.tool(id:)).flatMap(TerminalCatalog.logoImage) : nil)
+        let source = override ?? loadFile(app.iconFile) ?? brandLogo
         let result = draw(app, source: source)
         if override == nil { cache[key] = result }
         return result

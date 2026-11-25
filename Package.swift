@@ -18,7 +18,7 @@ let package = Package(
         .executableTarget(
             name: "OrbitApp",
             dependencies: ["OrbitCore"],
-            resources: [.copy("Resources/GlassIcons"), .copy("Resources/Backgrounds")],
+            resources: [.copy("Resources/GlassIcons"), .copy("Resources/Backgrounds"), .copy("Resources/BrandLogos")],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(name: "OrbitCoreTests", dependencies: ["OrbitCore"]),

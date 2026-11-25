@@ -208,6 +208,19 @@ enum RenderCheck {
         if let cg = presetShot.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-presets.png"))
         }
+        // Terminal tools: what is detected here, and every catalog logo on a card.
+        print("detected terminal tools:", TerminalCatalog.detect().map { "\($0.name) (\($0.commands[0]))" }.joined(separator: ", "))
+        do {
+            var d = originalCustomDoc
+            let apps = TerminalCatalog.all.map { CustomApp.from($0) }
+            d.customApps = apps
+            d.groups = [ShareGroup(name: "终端工具", bundleIDs: apps.map(\.key))]
+            d.template = .minimal; d.iconSize = .large; d.title = "我的终端工具"; d.caption = ""
+            model.custom.doc = d
+            if let png = ShareRenderer.png(CustomShareCardView(doc: d, groups: resolved(d))) {
+                try? png.write(to: dir.appendingPathComponent("terminal-logos.png"))
+            }
+        }
         // Custom apps: full-bleed art, a transparent logo, and no picture at all.
         do {
             var d = originalCustomDoc
