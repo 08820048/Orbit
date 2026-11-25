@@ -271,3 +271,56 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(BubblePacking.pack(weights: [0, 0], in: area).isEmpty)
     }
 }
+
+@Suite struct MacProfileTests {
+    @Test func parsesSystemProfilerOutput() throws {
+        let json = #"""
+        {"SPHardwareDataType":[{"machine_name":"MacBook Air","machine_model":"Mac15,12","chip_type":"Apple M3",
+         "physical_memory":"16 GB","serial_number":"SECRET","platform_UUID":"SECRET-UUID"}]}
+        """#
+        let parsed = try #require(MacProfile.parse(systemProfilerJSON: Data(json.utf8)))
+        #expect(parsed == MacProfile.Parsed(modelName: "MacBook Air", modelIdentifier: "Mac15,12", chip: "Apple M3", memoryGB: 16))
+    }
+
+    @Test func fallsBackToTheIntelProcessorName() throws {
+        let json = #"{"SPHardwareDataType":[{"machine_name":"iMac","machine_model":"iMac19,1","processor_name":"6-Core Intel Core i5","physical_memory":"32 GB"}]}"#
+        let parsed = try #require(MacProfile.parse(systemProfilerJSON: Data(json.utf8)))
+        #expect(parsed.chip == "6-Core Intel Core i5")
+        #expect(parsed.memoryGB == 32)
+    }
+
+    @Test func rejectsGarbage() {
+        #expect(MacProfile.parse(systemProfilerJSON: Data("not json".utf8)) == nil)
+        #expect(MacProfile.parse(systemProfilerJSON: Data("{}".utf8)) == nil)
+    }
+
+    @Test func storageShowsTheSizeOnTheBox() {
+        #expect(MacProfile.storageLabel(forBytes: 494_384_795_648) == "512 GB")
+        #expect(MacProfile.storageLabel(forBytes: 245_000_000_000) == "256 GB")
+        #expect(MacProfile.storageLabel(forBytes: 994_662_584_320) == "1 TB")
+        #expect(MacProfile.storageLabel(forBytes: 1_990_000_000_000) == "2 TB")
+    }
+
+    @Test func profileHasNoDeviceIdentifiers() {
+        // The type must not be able to carry a serial number or UUID.
+        let names = Set(Mirror(reflecting: MacProfile(modelName: "", modelIdentifier: "", chip: "", memoryGB: nil, storageBytes: nil, system: "")).children.compactMap(\.label))
+        #expect(names.isDisjoint(with: ["serialNumber", "serial", "uuid", "platformUUID", "udid"]))
+    }
+}
+
+@Suite struct DockReaderTests {
+    @Test func readsAppsInOrderAndSkipsSpacers() {
+        let entries: [[String: Any]] = [
+            ["tile-type": "file-tile", "tile-data": ["file-label": "Safari浏览器", "bundle-identifier": "com.apple.Safari",
+                                                      "file-data": ["_CFURLString": "file:///Applications/Safari.app/"]]],
+            ["tile-type": "spacer-tile", "tile-data": [String: Any]()],
+            ["tile-type": "file-tile", "tile-data": ["file-label": "Zed", "bundle-identifier": "dev.zed.Zed",
+                                                      "file-data": ["_CFURLString": "file:///Applications/Zed.app/"]]],
+            ["tile-type": "file-tile", "tile-data": ["file-label": ""]],
+        ]
+        let items = DockReader.items(from: entries, kind: .app)
+        #expect(items.map(\.name) == ["Safari浏览器", "Zed"])
+        #expect(items.map(\.bundleID) == ["com.apple.Safari", "dev.zed.Zed"])
+        #expect(items[0].path == "/Applications/Safari.app")
+    }
+}

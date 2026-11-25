@@ -3,8 +3,29 @@ import OrbitCore
 
 // Developer tool: import Screen Time into a history store and print the stats the app would show.
 // Usage: orbit-cli [--store <path>] [--year 2026] [--month 11]
+//        orbit-cli gear   — print this Mac's equipment profile
+//        orbit-cli dock   — print the apps pinned in the Dock
 
 let args = Array(CommandLine.arguments.dropFirst())
+
+if args.first == "gear" {
+    let p = MacProfile.current()
+    print("机型：\(p.modelName)（\(p.modelIdentifier)）")
+    print("芯片：\(p.chip)")
+    print("内存：\(p.memoryLabel ?? "未知")")
+    print("存储：\(p.storageLabel ?? "未知")（系统报告 \(p.storageBytes.map { String($0) } ?? "—") 字节）")
+    print("系统：\(p.system)")
+    exit(0)
+}
+if args.first == "dock" {
+    for (i, item) in DockReader.pinnedApps().enumerated() {
+        print(String(format: "%2d. %@  [%@]", i + 1, item.name as NSString, (item.bundleID ?? "-") as NSString))
+    }
+    let folders = DockReader.folders()
+    if !folders.isEmpty { print("文件夹：" + folders.map(\.name).joined(separator: "、")) }
+    exit(0)
+}
+
 func option(_ name: String) -> String? {
     guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
     return args[i + 1]
