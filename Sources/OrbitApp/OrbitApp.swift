@@ -204,8 +204,15 @@ enum RenderCheck {
         if let cg = us.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-usage-photo.png"))
         }
-        model.custom.doc.mode = .picked
         model.custom.doc.background = "default"
+        model.dataStyle.template = .report
+        let rp = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        rp.scale = 2
+        if let cg = rp.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("screen-usage-report.png"))
+        }
+        model.dataStyle.template = .ranking
+        model.custom.doc.mode = .picked
         model.custom.doc.groups = []
         let rank = model.recencyScores()
         for preset in GroupPreset.all {

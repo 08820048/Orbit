@@ -49,22 +49,23 @@ struct ShareHubView: View {
     private var canExport: Bool { mode == .usage ? !usageData.isEmpty : custom.totalApps > 0 }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScreenHeader(title: "分享图") {
-                Text(mode == .usage
-                     ? "\(model.periodTitle) · Top \(model.dataStyle.topN)"
-                     : "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件")
-                    .font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
-                Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
-                Button("拷贝图片  ⌘C") { copy() }.glassButton(primary: true)
-                    .keyboardShortcut("c", modifiers: .command).disabled(!canExport)
-            }
-            HStack(spacing: 0) {
+        // The inspector runs the full window height; title and export actions sit above the preview only.
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                ScreenHeader(title: "分享图") {
+                    Text(mode == .usage
+                         ? "\(model.periodTitle) · Top \(model.dataStyle.topN)"
+                         : "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件")
+                        .font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
+                    Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
+                    Button("拷贝图片  ⌘C") { copy() }.glassButton(primary: true)
+                        .keyboardShortcut("c", modifiers: .command).disabled(!canExport)
+                }
                 Group {
                     if mode == .usage { usagePreview } else { preview }
                 }
-                inspector.frame(width: 340)
             }
+            inspector.frame(width: 340)
         }
         .overlay(alignment: .top) {
             if let toast {
@@ -94,6 +95,7 @@ struct ShareHubView: View {
                     ShareCardView(style: style, data: data)
                         .scaleEffect(s, anchor: .center)
                         .frame(width: size.width * s, height: size.height * s)
+                        .clipShape(RoundedRectangle(cornerRadius: custom.doc.cornerRadius * s, style: .continuous))
                         .shadow(color: .black.opacity(0.5), radius: 40, y: 24)
                         .shadow(color: Theme.accent.opacity(0.25), radius: 40)
                         .position(x: geo.size.width / 2, y: (geo.size.height - 24) / 2)
@@ -125,6 +127,7 @@ struct ShareHubView: View {
                     CustomShareCardView(doc: custom.doc, groups: groups)
                         .scaleEffect(s)
                         .frame(width: size.width * s, height: size.height * s)
+                        .clipShape(RoundedRectangle(cornerRadius: custom.doc.cornerRadius * s, style: .continuous))
                         .shadow(color: .black.opacity(0.55), radius: 40, y: 24)
                         .shadow(color: Theme.accent.opacity(0.22), radius: 40)
                         .position(x: geo.size.width / 2, y: (geo.size.height - 20) / 2)
