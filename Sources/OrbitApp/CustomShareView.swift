@@ -58,6 +58,8 @@ struct ShareHubView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
+                Text(captionText).font(.system(size: 11)).foregroundStyle(Theme.text2).lineLimit(1)
+                    .frame(maxWidth: .infinity, minHeight: 16).padding(.horizontal, 24).padding(.top, 14)
                 Group {
                     if mode == .usage { usagePreview } else { preview }
                 }
@@ -80,10 +82,9 @@ struct ShareHubView: View {
         }
     }
 
-    /// Caption and export actions, directly under the card they act on.
+    /// Export actions, directly under the card they act on (the card's info line sits above it).
     private var actionBar: some View {
         HStack(spacing: 16) {
-            Text(captionText).font(.system(size: 11)).foregroundStyle(Theme.text2).lineLimit(1)
             Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
             Button("分享…") { shareWithSystem() }.glassButton().disabled(!canExport).background(ShareAnchorView(anchor: shareAnchor))
             Button("复制清单") { copyList() }.glassButton().disabled(!canExport).help("把软件名复制成文字，和图一起发")
