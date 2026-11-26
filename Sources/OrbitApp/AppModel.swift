@@ -30,6 +30,7 @@ final class AppModel: ObservableObject {
     let reader = ScreenTimeReader()
     let catalog = AppCatalog()
     let custom = CustomShareModel()
+    let updater = UpdateModel()
     /// Layout choices of the usage-ranking share card (session-only; the shared look lives in `custom.doc`).
     @Published var dataStyle = ShareStyle()
     private(set) var monitor: ForegroundMonitor?

@@ -9,6 +9,9 @@ let package = Package(
         .executable(name: "orbit-cli", targets: ["OrbitCLI"]),
         .executable(name: "Orbit", targets: ["OrbitApp"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.7.0"),
+    ],
     targets: [
         .target(
             name: "OrbitCore",
@@ -17,7 +20,7 @@ let package = Package(
         .executableTarget(name: "OrbitCLI", dependencies: ["OrbitCore"]),
         .executableTarget(
             name: "OrbitApp",
-            dependencies: ["OrbitCore"],
+            dependencies: ["OrbitCore", .product(name: "Sparkle", package: "Sparkle")],
             resources: [.copy("Resources/GlassIcons"), .copy("Resources/Backgrounds"), .copy("Resources/BrandLogos")],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

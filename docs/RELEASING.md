@@ -12,7 +12,14 @@
      --apple-id <你的 Apple ID> --team-id <团队 ID> --password <App 专用密码>
    ```
 
-3. 用完整的 Xcode：`export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。
+3. 生成更新签名密钥（只需一次，**私钥只存在你的钥匙串里，不要提交、不要丢**）：
+
+   ```sh
+   .build/artifacts/sparkle/Sparkle/bin/generate_keys --account orbit
+   ```
+
+   它会打印公钥。公钥已写在 `scripts/build-app.sh` 里（`SPARKLE_PUBLIC_KEY`）。换了密钥就要同步改这里，而且**已发布的旧版本无法再用新密钥更新**。备份私钥：`generate_keys --account orbit -x orbit-sparkle-key`，存到安全的地方。
+4. 用完整的 Xcode：`export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。
 
 ## 发一个版本
 
@@ -29,7 +36,23 @@
    证书在钥匙串里有重名时，用 `security find-identity -v -p codesigning` 查出 SHA-1，填 SHA-1。
 
    脚本会依次：构建通用二进制并用 Hardened Runtime 签名 → 打 DMG 并签名 → 提交公证并等待 → 装订 → 用 `spctl` 校验。校验结果必须是 `accepted` 加 `source=Notarized Developer ID`，否则不要发布。
-4. 产物在 `build/release/Orbit-<版本>.dmg`。在 GitHub 上建 Release，上传这个 DMG。
+4. 产物在 `build/release/`：
+   - `Orbit-<版本>.dmg`：给用户下载的安装包
+   - `Orbit-<版本>.zip`：Sparkle 更新用的压缩包（已用 EdDSA 签名）
+   - `appcast.xml`：更新清单
+
+   在 GitHub 上建 Release `v<版本>`，**三个文件都上传**。应用的更新地址是 `releases/latest/download/appcast.xml`，所以最新 Release 里的 `appcast.xml` 就是所有旧版本检查更新时读到的清单。
+
+## 更新是怎么工作的
+
+- App 启动后按 `SUScheduledCheckInterval`（每天）请求 `appcast.xml`；用户也可以在设置里点「检查更新…」。
+- 清单里的版本号（`sparkle:version`，即构建号）比当前大，就下载 zip，用内置的公钥验证 EdDSA 签名，再替换 App。签名不对的包一律拒绝。
+- 隐私：不发送系统信息（`SUSendProfileInfo` 为 false）。
+- 发新版本前，务必确认新 Release 里有 `appcast.xml`；漏传的话，旧版本检查更新会失败（静默，不打扰用户）。
+
+## 第一次发布后的验证
+
+第一个版本发出去之后，装上它，再发一个更高版本，确认应用里能检查到并升级。这是唯一能验证完整更新链路的办法。
 
 ## 本地开发构建
 

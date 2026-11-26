@@ -17,7 +17,7 @@ struct SettingsView: View {
                         line("本地记录", "\(model.sessionCount) 条，最早 \(model.earliest?.formatted(date: .abbreviated, time: .omitted) ?? "—")")
                         line("上次导入", model.lastImport?.formatted(date: .abbreviated, time: .shortened) ?? "还没有")
                     }
-                    Text("Orbit 不联网，所有数据只存在这台 Mac 的 ~/Library/Application Support/Orbit。")
+                    Text("除检查更新外，Orbit 不联网。所有数据只存在这台 Mac 的 ~/Library/Application Support/Orbit。")
                         .font(.system(size: 12)).foregroundStyle(Theme.text2)
                     if let err = model.lastError {
                         Text(err).font(.system(size: 12)).foregroundStyle(.orange)
@@ -32,6 +32,9 @@ struct SettingsView: View {
                     .padding(.top, 4)
                 }
                 .padding(.top, 30)
+
+                group("更新") { UpdateSection(updater: model.updater) }
+                    .padding(.top, 38)
 
                 group("关于数据准确性") {
                     Text("屏幕使用时间的统计规则由 macOS 决定，可能与你的直觉有出入（例如后台播放、全屏睡眠）。系统只保留约 3 周的数据，Orbit 会把读到的记录存下来，之后才能做年度统计。")
@@ -67,6 +70,41 @@ struct SettingsView: View {
         HStack(alignment: .top) {
             Text(k).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 80, alignment: .leading)
             Text(v).font(.system(size: 13))
+        }
+    }
+}
+
+/// "更新" group of the settings page.
+private struct UpdateSection: View {
+    @ObservedObject var updater: UpdateModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            row("当前版本") { Text(UpdateModel.versionText).font(.system(size: 13)) }
+            if updater.isAvailable {
+                row("自动检查") { GlassToggle(isOn: $updater.automatic) }
+                Text("每天检查一次。只请求版本信息，不发送任何使用数据，也不发送你的系统信息。")
+                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                HStack(spacing: 14) {
+                    Button("检查更新…") { updater.checkForUpdates() }.glassButton().disabled(!updater.canCheck)
+                    Text(statusText).font(.system(size: 12)).foregroundStyle(Theme.text2)
+                }
+            } else {
+                Text("这是开发版本，不会自动更新。").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            }
+        }
+    }
+
+    private var statusText: String {
+        guard let last = updater.lastCheck else { return "还没有检查过" }
+        let when = last.formatted(date: .abbreviated, time: .shortened)
+        return updater.lastResult.map { "上次检查：\(when)，\($0)" } ?? "上次检查：\(when)"
+    }
+
+    private func row<C: View>(_ k: String, @ViewBuilder _ v: () -> C) -> some View {
+        HStack(alignment: .center) {
+            Text(k).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 80, alignment: .leading)
+            v()
         }
     }
 }

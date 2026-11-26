@@ -37,6 +37,9 @@ struct OrbitApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("检查更新…") { model.updater.checkForUpdates() }
+            }
             CommandGroup(after: .newItem) {
                 Button("刷新数据") { Task { await model.refresh() } }.keyboardShortcut("r")
             }

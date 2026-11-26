@@ -42,4 +42,33 @@ echo "==> Verifying with Gatekeeper"
 spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG"
 spctl --assess --type execute --verbose=4 build/Orbit.app
 
-echo "Done: $DMG ($(du -h "$DMG" | cut -f1))"
+echo "==> Sparkle update archive and appcast"
+# The archive is made from the stapled app. It is signed with the EdDSA key in the keychain (account "orbit").
+REPO="${GITHUB_REPO:-08820048/Orbit}"
+ZIP="$OUT/Orbit-$VERSION.zip"
+BUILD="$(plutil -extract CFBundleVersion raw build/Orbit.app/Contents/Info.plist)"
+rm -f "$ZIP"
+/usr/bin/ditto -c -k --sequesterRsrc --keepParent build/Orbit.app "$ZIP"
+SIGNATURE="$(.build/artifacts/sparkle/Sparkle/bin/sign_update --account "${SPARKLE_ACCOUNT:-orbit}" "$ZIP")"   # sparkle:edSignature="…" length="…"
+PUB_DATE="$(LC_ALL=C date '+%a, %d %b %Y %H:%M:%S %z')"
+cat > "$OUT/appcast.xml" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Orbit</title>
+    <item>
+      <title>Orbit $VERSION</title>
+      <link>https://github.com/$REPO/releases/tag/v$VERSION</link>
+      <pubDate>$PUB_DATE</pubDate>
+      <sparkle:version>$BUILD</sparkle:version>
+      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/Orbit-$VERSION.zip" type="application/octet-stream" $SIGNATURE/>
+    </item>
+  </channel>
+</rss>
+XML
+
+echo
+echo "Done. Upload these three files to the GitHub release v$VERSION:"
+ls -lh "$DMG" "$ZIP" "$OUT/appcast.xml" | awk '{print "  " $5 "  " $9}'
