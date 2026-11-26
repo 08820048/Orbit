@@ -6,7 +6,7 @@ import SwiftUI
 // MARK: - Document
 
 enum ShareMode: String, Codable, CaseIterable, Identifiable {
-    case usage = "数据排行", picked = "自选软件", gear = "我的装备"
+    case usage = "数据排行", picked = "自选软件"
     var id: String { rawValue }
 }
 
@@ -89,10 +89,6 @@ struct CustomShareDoc: Codable, Equatable {
     var cornerRadius = 24.0
     /// Title override for the usage-ranking card; empty = automatic.
     var usageTitle = ""
-    /// "My equipment" card: title override (empty = the model name), caption, and which facts to show.
-    var gearTitle = ""
-    var gearCaption = ""
-    var gearItems: [String] = ["chip", "memory", "storage", "system"]
 
     init() {}
 
@@ -118,9 +114,6 @@ struct CustomShareDoc: Codable, Equatable {
         mode = try c.decodeIfPresent(ShareMode.self, forKey: .mode) ?? d.mode
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
         usageTitle = try c.decodeIfPresent(String.self, forKey: .usageTitle) ?? d.usageTitle
-        gearTitle = try c.decodeIfPresent(String.self, forKey: .gearTitle) ?? d.gearTitle
-        gearCaption = try c.decodeIfPresent(String.self, forKey: .gearCaption) ?? d.gearCaption
-        gearItems = try c.decodeIfPresent([String].self, forKey: .gearItems) ?? d.gearItems
     }
 }
 

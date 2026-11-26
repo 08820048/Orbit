@@ -51,13 +51,7 @@ struct ShareHubView: View {
         return s
     }
 
-    private var canExport: Bool {
-        switch mode {
-        case .usage: !usageData.isEmpty
-        case .picked: custom.totalApps > 0
-        case .gear: model.macProfile != nil
-        }
-    }
+    private var canExport: Bool { mode == .usage ? !usageData.isEmpty : custom.totalApps > 0 }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -78,7 +72,7 @@ struct ShareHubView: View {
         }
         .sheet(isPresented: $showPicker) { AppPickerSheet(custom: custom).environmentObject(model) }
         .task {
-            await model.loadMacFacts()
+            model.loadDock()
             await custom.loadInstalledIfNeeded()
             custom.seedIfNeeded(scores: model.recencyScores())
         }
@@ -104,7 +98,6 @@ struct ShareHubView: View {
             let style = usageStyle
             return "\(model.periodTitle) · \(style.template == .bubbles ? "\(style.bubbleCount) 个应用" : "Top \(style.topN)") · \(style.template.ratio)"
         }
-        if mode == .gear { return model.macProfile == nil ? "" : "我的装备 · \(custom.doc.ratio.label)" }
         guard custom.totalApps > 0 else { return "" }
         return "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件 · \(custom.doc.ratio.label)"
     }
@@ -137,10 +130,7 @@ struct ShareHubView: View {
             let size = custom.doc.ratio.size
             let s = min((geo.size.width - 80) / size.width, (geo.size.height - 40) / size.height, 1)
             ZStack {
-                if mode == .gear && model.macProfile == nil {
-                    Text("正在读取这台 Mac 的信息…").font(.system(size: 13)).foregroundStyle(Theme.text2)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                } else if mode == .picked && custom.totalApps == 0 {
+                if custom.totalApps == 0 {
                     VStack(spacing: 14) {
                         GlassIcon(index: GI.layout, size: 84)
                         Text("还没有选择软件").font(.system(size: 18, weight: .bold))
@@ -152,7 +142,7 @@ struct ShareHubView: View {
                     .padding(.horizontal, 40)
                     .frame(width: geo.size.width, height: geo.size.height)
                 } else {
-                    CustomShareCardView(doc: custom.doc, groups: mode == .gear ? [] : groups, gear: mode == .gear ? model.macProfile : nil)
+                    CustomShareCardView(doc: custom.doc, groups: groups)
                         .scaleEffect(s)
                         .frame(width: size.width * s, height: size.height * s)
                         .clipShape(RoundedRectangle(cornerRadius: custom.doc.cornerRadius * s, style: .continuous))
@@ -188,24 +178,20 @@ struct ShareHubView: View {
     private var contentPage: some View {
         group("内容来源") {
             GlassSegmented(options: ShareMode.allCases, label: \.rawValue, selection: $custom.doc.mode, fill: true)
-            Text(mode == .usage ? "用真实的使用时长生成排行、年度报告。" : mode == .picked ? "自己挑选想展示的软件，分组后生成分享图。" : "把这台 Mac 的机型、芯片、内存等做成一张图。不含序列号。")
+            Text(mode == .usage ? "用真实的使用时长生成排行、年度报告。" : "自己挑选想展示的软件，分组后生成分享图。")
                 .font(.system(size: 11)).foregroundStyle(Theme.text2)
         }
-        switch mode {
-        case .usage: usageContentSections
-        case .picked: pickedContentSections
-        case .gear: gearContentSections
-        }
+        if mode == .usage { usageContentSections } else { pickedContentSections }
     }
 
     @ViewBuilder
     private var stylePage: some View {
-        if mode == .usage { usageLayoutSection } else { pickedLayoutSection }   // gear shares the picked templates (background and ink)
+        if mode == .usage { usageLayoutSection } else { pickedLayoutSection }
         group("背景") {
             GlassSegmented(options: [0, 1, 2], label: { ["内置", "我的图片", "纯色"][$0] }, selection: $bgTab, fill: true)
             backgroundPicker
             if custom.doc.background.hasPrefix("builtin:") || custom.doc.background.hasPrefix("custom:")
-                || (mode != .usage && custom.doc.background == "default" && custom.doc.template == .fjord) {
+                || (mode == .picked && custom.doc.background == "default" && custom.doc.template == .fjord) {
                 row("遮罩强度") { Text("\(Int(custom.doc.overlay * 100))%").foregroundStyle(Theme.text2) }
                 Slider(value: $custom.doc.overlay, in: 0...1)
                 row("背景模糊") { Text("\(Int(custom.doc.blur))").foregroundStyle(Theme.text2) }
@@ -225,15 +211,15 @@ struct ShareHubView: View {
             }
         }
         group("外观") {
-            if mode != .usage {
+            if mode == .picked {
                 row("比例") { GlassSegmented(options: CanvasRatio.allCases, label: \.rawValue, selection: $custom.doc.ratio) }
             }
             row("圆角") { Text("\(Int(custom.doc.cornerRadius)) pt").foregroundStyle(Theme.text2).monospacedDigit() }
             Slider(value: $custom.doc.cornerRadius, in: 0...56, step: 2)
-            if mode != .usage {
-                if mode == .picked { row("图标大小") { GlassSegmented(options: IconSize.allCases, label: \.rawValue, selection: $custom.doc.iconSize) } }
+            if mode == .picked {
+                row("图标大小") { GlassSegmented(options: IconSize.allCases, label: \.rawValue, selection: $custom.doc.iconSize) }
                 row("标题字体") { GlassSegmented(options: TitleFont.allCases, label: \.rawValue, selection: $custom.doc.titleFont) }
-                if mode == .picked { row("显示软件名称") { GlassToggle(isOn: $custom.doc.showNames) } }
+                row("显示软件名称") { GlassToggle(isOn: $custom.doc.showNames) }
             } else if model.dataStyle.template == .bubbles {
                 row("图标间距") { Text("\(Int(model.dataStyle.bubbleSpacing))%").foregroundStyle(Theme.text2).monospacedDigit() }
                 Slider(value: $model.dataStyle.bubbleSpacing, in: 0...30, step: 1)
@@ -298,28 +284,6 @@ struct ShareHubView: View {
         case .card: AnyShapeStyle(RadialGradient(colors: [Theme.accent.opacity(0.7), Color(hex: 0x060E20)], center: .init(x: 0.5, y: 0.35), startRadius: 0, endRadius: 60))
         case .report: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x0F2C66), Color(hex: 0x0A1B44)], startPoint: .topTrailing, endPoint: .bottomLeading))
         case .bubbles: AnyShapeStyle(Color(hex: 0x3A3D47))
-        }
-    }
-
-    @ViewBuilder
-    private var gearContentSections: some View {
-        group("文案") {
-            field("标题（留空显示机型）") { TextField(model.macProfile?.modelName ?? "机型", text: $custom.doc.gearTitle) }
-            field("文案（可留空，可换行）") { TextField("一句话", text: $custom.doc.gearCaption, axis: .vertical).lineLimit(1...3) }
-            field("署名") { TextField("署名", text: $custom.doc.signature) }
-        }
-        group("显示内容") {
-            ForEach([("chip", "芯片"), ("memory", "内存"), ("storage", "存储"), ("system", "系统版本"), ("model", "机型标识")], id: \.0) { key, name in
-                row(name) {
-                    GlassToggle(isOn: Binding(
-                        get: { custom.doc.gearItems.contains(key) },
-                        set: { on in
-                            if on { if !custom.doc.gearItems.contains(key) { custom.doc.gearItems.append(key) } }
-                            else { custom.doc.gearItems.removeAll { $0 == key } }
-                        }))
-                }
-            }
-            Text("不会读取或显示序列号、硬件 UUID。").font(.system(size: 11)).foregroundStyle(Theme.text2)
         }
     }
 
@@ -501,7 +465,7 @@ struct ShareHubView: View {
 
     private func png() -> Data? {
         if mode == .usage { return ShareRenderer.png(style: usageStyle, data: usageData) }
-        return ShareRenderer.png(CustomShareCardView(doc: custom.doc, groups: mode == .gear ? [] : groups, gear: mode == .gear ? model.macProfile : nil))
+        return ShareRenderer.png(CustomShareCardView(doc: custom.doc, groups: groups))
     }
 
     /// The macOS share menu (Messages, Mail, AirDrop…). The card goes out as a PNG file; nothing is uploaded by Orbit.

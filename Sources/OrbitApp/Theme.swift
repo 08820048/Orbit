@@ -1,4 +1,5 @@
 import AppKit
+import OrbitCore
 import SwiftUI
 
 // Design tokens from the approved Doop canvas (Sk4PPlUPfx), Glass style; flat fills, no gradients in the UI chrome.
@@ -159,5 +160,24 @@ extension View {
     /// Glass push button. `focusable(false)` stops macOS drawing the blue keyboard-focus ring on first launch.
     func glassButton(primary: Bool = false) -> some View {
         buttonStyle(GlassButtonStyle(primary: primary)).focusable(false)
+    }
+}
+
+struct EmptyStateView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            GlassIcon(index: GI.timer, size: 84)
+            Text("这段时间还没有记录").font(.system(size: 18, weight: .bold))
+            Text(model.access == .granted
+                 ? "换一个时间范围，或者点「刷新」重新读取。"
+                 : "没有读取屏幕使用时间的权限。Orbit 正在从现在开始记录，用一会儿再来看。")
+                .font(.system(size: 13)).foregroundStyle(Theme.text2).multilineTextAlignment(.center)
+            if model.access != .granted {
+                Button("打开系统设置授权") { model.openFullDiskAccessSettings() }.glassButton(primary: true)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

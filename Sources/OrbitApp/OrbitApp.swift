@@ -85,9 +85,6 @@ struct MainView: View {
             TopBar()
             Group {
                 switch model.section {
-                case .home: HomeView()
-                case .overview: OverviewView()
-                case .app: AppDetailView()
                 case .share: ShareHubView(custom: model.custom)
                 case .settings: SettingsView()
                 }
@@ -104,23 +101,18 @@ struct MainView: View {
     }
 }
 
-/// Top menu: the main sections centred in the window's title strip.
+/// Top menu: the two sections centred in the window's title strip.
 struct TopBar: View {
     @EnvironmentObject var model: AppModel
 
     private static let items: [(title: String, icon: Int, section: AppModel.Section)] = [
-        ("我的 Mac", GI.orbit, .home), ("创作", GI.share, .share), ("设置", GI.gear, .settings),
+        ("分享", GI.share, .share), ("设置", GI.gear, .settings),
     ]
-
-    /// The usage pages live under "我的 Mac".
-    private func isSelected(_ section: AppModel.Section) -> Bool {
-        model.section == section || (section == .home && (model.section == .overview || model.section == .app))
-    }
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(Self.items, id: \.section) { item in
-                let selected = isSelected(item.section)
+                let selected = model.section == item.section
                 HStack(spacing: 7) {
                     GlassIcon(index: item.icon, size: 20)
                     Text(item.title).font(.system(size: 13, weight: .medium))
@@ -148,8 +140,7 @@ enum RenderCheck {
         let dir = URL(fileURLWithPath: args[i + 1])
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         await model.refresh()
-        model.macProfile = MacProfile.current()
-        model.dockApps = DockReader.pinnedApps().filter { $0.bundleID != nil && $0.bundleID != "com.apple.apps.launcher" }
+        model.loadDock()
         guard let s = model.summary else { exit(2) }
         let entries = s.topApps.prefix(30).map {
             let info = model.catalog.info(for: $0.bundleID)
@@ -159,7 +150,7 @@ enum RenderCheck {
                              averageSeconds: s.averagePerActiveDay, longestDay: s.longestDay, appCount: s.appCount,
                              share: (s.topApps.first?.seconds ?? 0) / max(s.totalSeconds, 1), entries: Array(entries))
         // Whole-window renders of each screen, for visual verification without touching the desktop.
-        for (name, section) in [("home", AppModel.Section.home), ("overview", .overview), ("app", .app), ("share", .share), ("settings", .settings)] {
+        for (name, section) in [("share", AppModel.Section.share), ("settings", .settings)] {
             model.hasOnboarded = true
             model.section = section
             model.custom.doc.mode = .usage
@@ -194,17 +185,6 @@ enum RenderCheck {
                 var d = doc; d.template = t; d.ratio = ratio
                 if let png = ShareRenderer.png(CustomShareCardView(doc: d, groups: resolved(d))) {
                     try? png.write(to: dir.appendingPathComponent("custom-\(t.rawValue)-\(ratio.rawValue).png"))
-                }
-            }
-        }
-        // Equipment card: two looks, landscape and portrait.
-        if let profile = model.macProfile {
-            for t in [CustomTemplate.glass, .fjord, .paper] {
-                for ratio in [CanvasRatio.landscape, .portrait] {
-                    var d = doc; d.mode = .gear; d.template = t; d.ratio = ratio; d.gearItems = ["chip", "memory", "storage", "system", "model"]
-                    if let png = ShareRenderer.png(CustomShareCardView(doc: d, groups: [], gear: profile)) {
-                        try? png.write(to: dir.appendingPathComponent("gear-\(t.rawValue)-\(ratio.rawValue).png"))
-                    }
                 }
             }
         }
