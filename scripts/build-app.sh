@@ -12,6 +12,7 @@ APP=build/Orbit.app
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Orbit" "$APP/Contents/MacOS/Orbit"
 cp -R "$BIN_DIR"/Orbit_OrbitApp.bundle "$APP/Contents/Resources/"
+cp Packaging/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -22,6 +23,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>Orbit</string>
   <key>CFBundleDisplayName</key><string>Orbit</string>
   <key>CFBundleExecutable</key><string>Orbit</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundleVersion</key><string>1</string>
