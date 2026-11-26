@@ -67,7 +67,8 @@ private enum Blue {
     static let normal = [Color(hex: 0x5C9DFF), Color(hex: 0x3B82F6), Color(hex: 0x2D6CE3)]
     static let hover = [Color(hex: 0x6BA7FF), Color(hex: 0x4A8EFA), Color(hex: 0x3877EA)]
     static let pressed = [Color(hex: 0x2F6FE0), Color(hex: 0x2A66D6)]
-    static let rim = Color(hex: 0x081E5A, opacity: 0.55)
+    /// Hairline around blue surfaces: a faint light edge, never a dark outline.
+    static let rim = Color.white.opacity(0.14)
 }
 
 /// Indices into the Glass icon pack (file number = index). See Design/GlassIcons.
@@ -153,7 +154,6 @@ private struct GlassButtonBody: View {
                 else { Bevel(radius: 9, top: primary ? .white.opacity(0.38) : Theme.glassHighlight, bottom: primary ? .black.opacity(0.14) : .clear) }
             }
             .overlay(shape.strokeBorder(primary ? Blue.rim : Theme.glassHairline, lineWidth: 0.5))
-            .shadow(color: .black.opacity(pressed ? 0 : 0.35), radius: 1, y: 1)
             .shadow(color: primary && !pressed ? Theme.accent.opacity(0.28) : .clear, radius: 8, y: 5)
             .offset(y: pressed ? 0.5 : 0)
             .opacity(enabled ? 1 : 0.38)
@@ -189,7 +189,7 @@ struct GlassSegmented<T: Hashable>: View {
                                 .fill(LinearGradient(colors: Blue.normal, startPoint: .top, endPoint: .bottom))
                                 .overlay(Bevel(radius: 7, top: .white.opacity(0.38)))
                                 .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Blue.rim, lineWidth: 0.5))
-                                .shadow(color: .black.opacity(0.4), radius: 1.5, y: 1)
+                                .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
                         }
                     }
                     .contentShape(Rectangle())
