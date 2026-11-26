@@ -134,9 +134,13 @@ struct TopBar: View {
 /// `Orbit --render-check <dir>`: writes the three templates as PNGs and exits. Used for verification.
 @MainActor
 enum RenderCheck {
+    /// `ORBIT_LIGHT=1` renders the screens in light mode (default: dark).
+    static var isLight: Bool { ProcessInfo.processInfo.environment["ORBIT_LIGHT"] != nil }
+    static var scheme: ColorScheme { isLight ? .light : .dark }
     static func runIfRequested(_ model: AppModel) async {
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--render-check"), i + 1 < args.count else { return }
+        NSApp.appearance = NSAppearance(named: isLight ? .aqua : .darkAqua)
         let dir = URL(fileURLWithPath: args[i + 1])
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         await model.refresh()
@@ -154,14 +158,14 @@ enum RenderCheck {
             model.hasOnboarded = true
             model.section = section
             model.custom.doc.mode = .usage
-            let r = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+            let r = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, RenderCheck.scheme))
             r.scale = 2
             if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
                 try? png.write(to: dir.appendingPathComponent("screen-\(name).png"))
             }
         }
         model.hasOnboarded = false
-        let ob = ImageRenderer(content: RootView().environmentObject(model).frame(width: 860, height: 580).environment(\.colorScheme, .dark))
+        let ob = ImageRenderer(content: RootView().environmentObject(model).frame(width: 860, height: 580).environment(\.colorScheme, RenderCheck.scheme))
         if let cg = ob.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-onboarding.png"))
         }
@@ -197,7 +201,7 @@ enum RenderCheck {
         model.hasOnboarded = true
         model.section = .share
         model.custom.doc.mode = .picked
-        let ce = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        let ce = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, RenderCheck.scheme))
         if let cg = ce.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-custom.png"))
         }
@@ -208,14 +212,14 @@ enum RenderCheck {
         // Usage ranking on a photo background (shared look), full screen.
         model.custom.doc.mode = .usage
         model.custom.doc.background = "builtin:fjord"
-        let us = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        let us = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, RenderCheck.scheme))
         us.scale = 2
         if let cg = us.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-usage-photo.png"))
         }
         model.custom.doc.background = "default"
         model.dataStyle.template = .report
-        let rp = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        let rp = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, RenderCheck.scheme))
         rp.scale = 2
         if let cg = rp.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-usage-report.png"))
@@ -229,7 +233,7 @@ enum RenderCheck {
             let g = model.custom.doc.groups.last!
             print("preset", preset.name, "->", g.bundleIDs.map { model.catalog.info(for: $0).name }.joined(separator: ", "))
         }
-        let presetShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 1200).environment(\.colorScheme, .dark))
+        let presetShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 1200).environment(\.colorScheme, RenderCheck.scheme))
         presetShot.scale = 1
         if let cg = presetShot.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-presets.png"))
@@ -267,7 +271,7 @@ enum RenderCheck {
             for a in [art, logo] { CustomAppIcons.delete(file: a.iconFile) }
         }
         model.custom.doc.groups = []
-        let emptyShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, .dark))
+        let emptyShot = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, RenderCheck.scheme))
         if let cg = emptyShot.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             try? png.write(to: dir.appendingPathComponent("screen-custom-empty.png"))
         }

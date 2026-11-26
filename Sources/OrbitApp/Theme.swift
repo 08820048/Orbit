@@ -45,9 +45,9 @@ enum Theme {
     static let glassBottomHover = Color.dynamic(dark: (0xFFFFFF, 0.12), light: (0xFFFFFF, 0.78))
     static let glassPressed = Color.dynamic(dark: (0xFFFFFF, 0.05), light: (0x142868, 0.08))
     static let glassHighlight = Color.dynamic(dark: (0xFFFFFF, 0.20), light: (0xFFFFFF, 1.0))
-    static let glassHairline = Color.dynamic(dark: (0xFFFFFF, 0.10), light: (0x142868, 0.14))
+    static let glassHairline = Color.dynamic(dark: (0xFFFFFF, 0.10), light: (0x000000, 0.10))
     static let trough = Color.dynamic(dark: (0x000000, 0.22), light: (0x142868, 0.09))
-    static let troughShade = Color.dynamic(dark: (0x000000, 0.38), light: (0x142868, 0.20))
+    static let troughShade = Color.dynamic(dark: (0x000000, 0.38), light: (0x000000, 0.10))
 }
 
 /// Light edge on top and shade at the bottom, drawn just inside a rounded shape.
@@ -185,18 +185,17 @@ struct GlassSegmented<T: Hashable>: View {
                     .frame(minWidth: 40, maxWidth: fill ? .infinity : nil).frame(height: 24)
                     .background {
                         if on {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(LinearGradient(colors: Blue.normal, startPoint: .top, endPoint: .bottom))
-                                .overlay(Bevel(radius: 7, top: .white.opacity(0.38)))
-                                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Blue.rim, lineWidth: 0.5))
-                                .shadow(color: .black.opacity(0.18), radius: 1, y: 0.5)
+                                .overlay(Bevel(radius: 6, top: .white.opacity(0.38)))
+                                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Blue.rim, lineWidth: 0.5))
                         }
                     }
                     .contentShape(Rectangle())
                     .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { selection = option } }
             }
         }
-        .padding(2)
+        .padding(3)
         .background(Theme.trough, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(Bevel(radius: 9, top: Theme.troughShade))
         .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.glassHairline, lineWidth: 0.5))

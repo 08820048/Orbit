@@ -510,8 +510,8 @@ struct ShareHubView: View {
                 .contentShape(Rectangle()).onTapGesture { custom.removeGroup(g.id) }.help("删除分组")
         }
         .padding(.horizontal, 10).frame(height: 32)
-        .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(active ? Theme.accent : .clear, lineWidth: 1.5))
+        .background(active ? Theme.accent.opacity(0.14) : Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(active ? Theme.accent : .clear, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture { custom.activeGroup = g.id }
         .contextMenu {
