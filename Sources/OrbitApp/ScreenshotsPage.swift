@@ -419,7 +419,7 @@ struct PermissionGuide: View {
                     .font(.system(size: 15)).foregroundStyle(Theme.text2).padding(.top, 10)
                 VStack(alignment: .leading, spacing: 18) {
                     step(1, "点击下面的「打开系统设置」", nil)
-                    step(2, "在「隐私与安全性 → 屏幕录制」里，打开 Orbit 旁边的开关", "系统会要求输入密码或用触控 ID 确认")
+                    step(2, "在「隐私与安全性 → 屏幕录制」里，打开 Orbit 旁边的开关", "系统会要求输入密码或用触控 ID 确认。列表里没有 Orbit 的话，点列表左下角的「+」，选择 Orbit 应用")
                     step(3, "回到 Orbit，按提示重新打开", "macOS 授权后需要重启应用才会生效，Orbit 会帮你重新打开")
                 }
                 .padding(.top, 34)

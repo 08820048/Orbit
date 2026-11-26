@@ -8,7 +8,12 @@ import UniformTypeIdentifiers
 enum ScreenPermission {
     static var granted: Bool { CGPreflightScreenCaptureAccess() }
     /// Shows the system prompt the first time; afterwards it does nothing, so the user has to use System Settings.
-    @discardableResult static func request() -> Bool { CGRequestScreenCaptureAccess() }
+    /// macOS only lists an app under "Screen Recording" once it has actually tried to capture, so this also makes a real
+    /// ScreenCaptureKit request (it fails without permission, which is the point: it puts Orbit in the list).
+    @discardableResult static func request() -> Bool {
+        Task.detached { _ = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) }
+        return CGRequestScreenCaptureAccess()
+    }
     static func openSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") { NSWorkspace.shared.open(url) }
     }
