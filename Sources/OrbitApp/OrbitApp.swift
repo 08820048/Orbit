@@ -82,7 +82,7 @@ struct OrbitApp: App {
             RootView()
                 .environmentObject(model)
                 .frame(minWidth: 1080, minHeight: 720)
-                .task { await RenderCheck.runIfRequested(model) }
+                .task { await RenderCheck.runIfRequested(model); await CaptureSelfTest.runIfRequested(model) }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 800)
@@ -440,6 +440,37 @@ enum RenderCheck {
             guard let png = ShareRenderer.png(style: style, data: data) else { print("FAIL \(t)"); exit(1) }
             try? png.write(to: dir.appendingPathComponent("\(t.rawValue).png"))
             print("\(t.rawValue): \(png.count) bytes, \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
+        }
+        exit(0)
+    }
+}
+
+/// `Orbit --capture-selftest <dir>`: takes one real full-screen capture through the same code the shortcuts use, saves it
+/// into `<dir>` (never the user's library), prints what happened and exits. For verifying capture without clicking.
+@MainActor
+enum CaptureSelfTest {
+    static func runIfRequested(_ model: AppModel) async {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--capture-selftest"), i + 1 < args.count else { return }
+        let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        func say(_ s: String) { FileHandle.standardError.write(Data(("SELFTEST " + s + "\n").utf8)) }
+        say("permission granted: \(ScreenPermission.granted)")
+        say("shortcut conflicts: \(model.capture.conflicts.map(\.rawValue).sorted())")
+        do {
+            let screens = try await CaptureService.freezeScreens(includeCursor: false)
+            say("screens captured: \(screens.count)")
+            for s in screens { say("  \(s.image.width)x\(s.image.height) px, scale \(s.scale), colorspace \(s.image.colorSpace?.name as String? ?? "nil")") }
+            let rec = try CaptureService.save(screens[0].image, kind: .fullscreen, source: "selftest", scale: Double(screens[0].scale), format: .png, folder: dir)
+            say("saved: \(rec.path) (\(rec.byteCount) bytes)")
+            let windows = try await CaptureService.windows()
+            say("windows found: \(windows.count); first: \(windows.first?.title ?? "-")")
+            if let w = windows.first {
+                let img = try await CaptureService.captureWindow(w, includeCursor: false)
+                let wr = try CaptureService.save(img, kind: .window, source: w.title, scale: 2, format: .png, folder: dir)
+                say("window saved: \(wr.path) \(img.width)x\(img.height)")
+            }
+        } catch {
+            say("FAILED: \(error.localizedDescription)")
         }
         exit(0)
     }
