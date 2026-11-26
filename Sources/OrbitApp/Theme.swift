@@ -2,7 +2,7 @@ import AppKit
 import OrbitCore
 import SwiftUI
 
-// Design tokens from the approved Doop canvas (Sk4PPlUPfx), Glass style; flat fills, no gradients in the UI chrome.
+// Design tokens from the approved Doop canvas (Sk4PPlUPfx), Glass style. Controls (buttons, segmented, toggle) get a subtle bevel; panels and backgrounds stay flat.
 
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -37,6 +37,37 @@ enum Theme {
     static let accent = Color.dynamic(dark: (0x3B82F6, 1), light: (0x1F6BEA, 1))
     static let accentHi = Color(hex: 0x7FB0FF)
     static let accentLo = Color(hex: 0x0B47C4)
+
+    // Control surfaces (secondary buttons, segmented trough, toggle track). Dark values follow the approved Doop spec.
+    static let glassTop = Color.dynamic(dark: (0xFFFFFF, 0.15), light: (0xFFFFFF, 0.95))
+    static let glassBottom = Color.dynamic(dark: (0xFFFFFF, 0.08), light: (0xFFFFFF, 0.60))
+    static let glassTopHover = Color.dynamic(dark: (0xFFFFFF, 0.20), light: (0xFFFFFF, 1.0))
+    static let glassBottomHover = Color.dynamic(dark: (0xFFFFFF, 0.12), light: (0xFFFFFF, 0.78))
+    static let glassPressed = Color.dynamic(dark: (0xFFFFFF, 0.05), light: (0x142868, 0.08))
+    static let glassHighlight = Color.dynamic(dark: (0xFFFFFF, 0.20), light: (0xFFFFFF, 1.0))
+    static let glassHairline = Color.dynamic(dark: (0xFFFFFF, 0.10), light: (0x142868, 0.14))
+    static let trough = Color.dynamic(dark: (0x000000, 0.22), light: (0x142868, 0.09))
+    static let troughShade = Color.dynamic(dark: (0x000000, 0.38), light: (0x142868, 0.20))
+}
+
+/// Light edge on top and shade at the bottom, drawn just inside a rounded shape.
+private struct Bevel: View {
+    var radius: CGFloat
+    var top: Color
+    var bottom: Color = .clear
+    var body: some View {
+        RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(
+            LinearGradient(stops: [.init(color: top, location: 0), .init(color: .clear, location: 0.3),
+                                   .init(color: .clear, location: 0.7), .init(color: bottom, location: 1)],
+                           startPoint: .top, endPoint: .bottom), lineWidth: 1)
+    }
+}
+
+private enum Blue {
+    static let normal = [Color(hex: 0x5C9DFF), Color(hex: 0x3B82F6), Color(hex: 0x2D6CE3)]
+    static let hover = [Color(hex: 0x6BA7FF), Color(hex: 0x4A8EFA), Color(hex: 0x3877EA)]
+    static let pressed = [Color(hex: 0x2F6FE0), Color(hex: 0x2A66D6)]
+    static let rim = Color(hex: 0x081E5A, opacity: 0.55)
 }
 
 /// Indices into the Glass icon pack (file number = index). See Design/GlassIcons.
@@ -85,18 +116,49 @@ extension View {
 struct GlassButtonStyle: ButtonStyle {
     var primary = false
     func makeBody(configuration: Configuration) -> some View {
+        GlassButtonBody(configuration: configuration, primary: primary)
+    }
+}
+
+private struct GlassButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let primary: Bool
+    @Environment(\.isEnabled) private var enabled
+    @State private var hovering = false
+
+    private var pressed: Bool { configuration.isPressed }
+    private var hover: Bool { hovering && enabled && !pressed }
+
+    private var fill: LinearGradient {
+        let colors: [Color]
+        if primary {
+            colors = pressed ? Blue.pressed : hover ? Blue.hover : Blue.normal
+        } else {
+            colors = pressed ? [Theme.glassPressed, Theme.glassPressed]
+                : hover ? [Theme.glassTopHover, Theme.glassBottomHover] : [Theme.glassTop, Theme.glassBottom]
+        }
+        return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(primary ? Color.white : Theme.text)
+            .shadow(color: primary ? .black.opacity(0.18) : .clear, radius: 0, y: 1)
             .padding(.horizontal, 15).frame(height: 30)
-            .background {
-                if primary {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.accent)
-                } else {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.control)
-                }
+            .background(fill, in: shape)
+            .overlay {
+                if pressed { Bevel(radius: 9, top: Theme.troughShade) }
+                else { Bevel(radius: 9, top: primary ? .white.opacity(0.38) : Theme.glassHighlight, bottom: primary ? .black.opacity(0.14) : .clear) }
             }
-            .brightness(configuration.isPressed ? -0.08 : 0)
+            .overlay(shape.strokeBorder(primary ? Blue.rim : Theme.glassHairline, lineWidth: 0.5))
+            .shadow(color: .black.opacity(pressed ? 0 : 0.35), radius: 1, y: 1)
+            .shadow(color: primary && !pressed ? Theme.accent.opacity(0.28) : .clear, radius: 8, y: 5)
+            .offset(y: pressed ? 0.5 : 0)
+            .opacity(enabled ? 1 : 0.38)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: pressed)
     }
 }
 
@@ -105,7 +167,7 @@ struct WindowBackground: View {
     var body: some View { Theme.window.ignoresSafeArea() }
 }
 
-/// Segmented control in the Glass style.
+/// Segmented control in the Glass style: a recessed trough with a raised blue pill for the selection.
 struct GlassSegmented<T: Hashable>: View {
     let options: [T]
     let label: (T) -> String
@@ -115,13 +177,19 @@ struct GlassSegmented<T: Hashable>: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(options, id: \.self) { option in
+                let on = selection == option
                 Text(label(option))
                     .font(.system(size: 12))
-                    .foregroundStyle(selection == option ? Color.white : Theme.text2)
+                    .foregroundStyle(on ? Color.white : Theme.text2)
+                    .shadow(color: on ? .black.opacity(0.18) : .clear, radius: 0, y: 1)
                     .frame(minWidth: 40, maxWidth: fill ? .infinity : nil).frame(height: 24)
                     .background {
-                        if selection == option {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.accent)
+                        if on {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(LinearGradient(colors: Blue.normal, startPoint: .top, endPoint: .bottom))
+                                .overlay(Bevel(radius: 7, top: .white.opacity(0.38)))
+                                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Blue.rim, lineWidth: 0.5))
+                                .shadow(color: .black.opacity(0.4), radius: 1.5, y: 1)
                         }
                     }
                     .contentShape(Rectangle())
@@ -129,19 +197,29 @@ struct GlassSegmented<T: Hashable>: View {
             }
         }
         .padding(2)
-        .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(Theme.trough, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(Bevel(radius: 9, top: Theme.troughShade))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Theme.glassHairline, lineWidth: 0.5))
     }
 }
 
 struct GlassToggle: View {
     @Binding var isOn: Bool
     var body: some View {
-        Capsule().fill(isOn ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.control))
-            .frame(width: 34, height: 20)
+        let track = Capsule()
+        track.fill(isOn ? AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x4F93FF), Color(hex: 0x2F74EC)], startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(Theme.trough))
+            .frame(width: 38, height: 22)
+            .overlay(Capsule().strokeBorder(
+                LinearGradient(colors: [isOn ? Color.black.opacity(0.3) : Theme.troughShade, .clear], startPoint: .top, endPoint: .center), lineWidth: 1))
+            .overlay(track.strokeBorder(isOn ? Blue.rim : Theme.glassHairline, lineWidth: 0.5))
             .overlay(alignment: isOn ? .trailing : .leading) {
-                Circle().fill(.white).frame(width: 16, height: 16).padding(2)
-                    .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+                Circle().fill(LinearGradient(colors: [.white, Color(hex: 0xE4EAF5)], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 18, height: 18).padding(2)
+                    .overlay(Circle().strokeBorder(.black.opacity(0.12), lineWidth: 0.5).frame(width: 18, height: 18))
+                    .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
             }
+            .contentShape(Capsule())
             .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { isOn.toggle() } }
             .accessibilityAddTraits(.isButton)
     }
