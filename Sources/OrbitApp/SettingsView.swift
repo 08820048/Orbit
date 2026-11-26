@@ -35,12 +35,6 @@ struct SettingsView: View {
 
                 group("更新") { UpdateSection(updater: model.updater) }
                     .padding(.top, 38)
-
-                group("关于数据准确性") {
-                    Text("屏幕使用时间的统计规则由 macOS 决定，可能与你的直觉有出入（例如后台播放、全屏睡眠）。系统只保留约 3 周的数据，Orbit 会把读到的记录存下来，之后才能做年度统计。")
-                        .font(.system(size: 12)).foregroundStyle(Theme.text2).lineSpacing(4)
-                }
-                .padding(.top, 38)
             }
             .padding(.horizontal, 56).padding(.top, 22).padding(.bottom, 24)
             .frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading)
