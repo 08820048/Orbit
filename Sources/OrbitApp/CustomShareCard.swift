@@ -142,11 +142,17 @@ struct CustomShareCardView: View {
 
     // fjord / paper: group label on the left, icons on the right
     private let labelW: CGFloat = 104
-    private let rowGap: CGFloat = 14
+    /// Between groups, and between icon rows inside one group.
+    private let rowGap: CGFloat = 8
+    private let appRowGap: CGFloat = 6
 
+    /// Icons per row. Starts at 6 (landscape) / 4, but grows to fit the biggest group on one row, as far as the width allows;
+    /// only then does a group wrap onto a second row.
     private func columns(forGridWidth gw: CGFloat) -> Int {
-        let target = doc.ratio == .landscape ? 6 : 4
-        return max(1, min(target, Int(gw / (icon + 26))))
+        let base = doc.ratio == .landscape ? 6 : 4
+        let widest = visibleGroups.map(\.apps.count).max() ?? 0
+        let fit = max(1, Int(gw / (icon + 22)))
+        return max(1, min(max(base, widest), fit))
     }
 
     private func labeledRows(width w: CGFloat) -> some View {
@@ -159,7 +165,7 @@ struct CustomShareCardView: View {
                     Text(g.name).font(.system(size: 15, weight: .medium)).tracking(1.5).foregroundStyle(ink)
                         .shadow(color: .black.opacity(lightSurface ? 0 : 0.6), radius: 6, y: 1)
                         .frame(width: labelW, alignment: .leading).padding(.top, max(0, icon / 2 - 10))
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: appRowGap) {
                         ForEach(Array(Self.chunks(g.apps, cols).enumerated()), id: \.offset) { _, row in
                             HStack(spacing: 0) { ForEach(row) { tile($0, cellW: cellW) } }
                         }
@@ -321,7 +327,7 @@ struct CustomShareCardView: View {
         case .fjord, .paper:
             let cols = columns(forGridWidth: w - 2 * pad - labelW)
             let rows = visibleGroups.map { max(1, Int(ceil(Double($0.apps.count) / Double(cols)))) }
-            h += rows.reduce(0) { $0 + CGFloat($1) * cellH + CGFloat($1 - 1) * 10 } + CGFloat(max(0, rows.count - 1)) * rowGap
+            h += rows.reduce(0) { $0 + CGFloat($1) * cellH + CGFloat($1 - 1) * appRowGap } + CGFloat(max(0, rows.count - 1)) * rowGap
         case .glass:
             let pc = panelColumns(), gap: CGFloat = 12
             let panelW = (w - 2 * pad - CGFloat(pc - 1) * gap) / CGFloat(pc)
