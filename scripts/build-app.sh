@@ -2,7 +2,9 @@
 # Builds build/Orbit.app (ad-hoc signed). Usage: scripts/build-app.sh [debug|release]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+# SwiftUI macros need a full Xcode, not just the Command Line Tools. Set DEVELOPER_DIR to pick one;
+# otherwise use whatever xcode-select points at.
+if [[ -n "${DEVELOPER_DIR:-}" ]]; then export DEVELOPER_DIR; fi
 CONFIG="${1:-release}"
 swift build -c "$CONFIG" --product Orbit
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"

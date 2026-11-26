@@ -4,3 +4,7 @@
 build/
 *.xcodeproj/xcuserdata/
 DerivedData/
+.idea/
+.vscode/
+*.xcuserstate
+.env
