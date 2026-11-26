@@ -263,3 +263,16 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(items[0].path == "/Applications/Safari.app")
     }
 }
+
+@Suite struct ShareNoteTests {
+    @Test func limitsLengthAndKeepsOneLine() {
+        #expect(ShareNote.limit(String(repeating: "字", count: 30)).count == ShareNote.maxLength)
+        #expect(ShareNote.limit("写代码\n不卡") == "写代码 不卡")
+    }
+
+    @Test func keepsInnerSpacesWhileTypingButTrimsForTheCard() {
+        #expect(ShareNote.limit("Mac ") == "Mac ")
+        #expect(ShareNote.normalize("  Mac 瘦身 ") == "Mac 瘦身")
+        #expect(ShareNote.normalize("   ").isEmpty)
+    }
+}

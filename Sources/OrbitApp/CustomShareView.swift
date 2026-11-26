@@ -1,4 +1,5 @@
 import AppKit
+import OrbitCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -9,6 +10,7 @@ struct ShareHubView: View {
     @State private var toast: String?
     @State private var bgTab = 0   // 0 built-in, 1 my picture, 2 solid
     @State private var tab: InspectorTab = .content
+    @State private var noteKey: String?
     @StateObject private var shareAnchor = ShareAnchor()
 
     /// The inspector is split in two pages so it fits without a long scroll.
@@ -142,7 +144,7 @@ struct ShareHubView: View {
                     .padding(.horizontal, 40)
                     .frame(width: geo.size.width, height: geo.size.height)
                 } else {
-                    CustomShareCardView(doc: custom.doc, groups: groups)
+                    CustomShareCardView(doc: custom.doc, groups: groups, editing: custom.doc.showNotes ? noteEditing : nil)
                         .scaleEffect(s)
                         .frame(width: size.width * s, height: size.height * s)
                         .clipShape(RoundedRectangle(cornerRadius: custom.doc.cornerRadius * s, style: .continuous))
@@ -152,6 +154,12 @@ struct ShareHubView: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var noteEditing: NoteEditing {
+        NoteEditing(editingKey: noteKey, select: { noteKey = $0 }, text: { key in
+            Binding(get: { custom.note(for: key) }, set: { custom.setNote($0, for: key) })
+        })
     }
 
     // MARK: Inspector
@@ -289,6 +297,23 @@ struct ShareHubView: View {
 
     @ViewBuilder
     private var pickedContentSections: some View {
+        group("短评") {
+            row("显示软件短评") { GlassToggle(isOn: $custom.doc.showNotes) }
+            Text(custom.doc.showNotes
+                 ? "软件改为「图标 + 名称 + 一句话」排列，每组一列。点击卡片上的软件即可输入，最多 \(ShareNote.maxLength) 个字。"
+                 : "给每个软件配一句话，说说为什么用它。开启后版式会改成每组一列。")
+                .font(.system(size: 11)).foregroundStyle(Theme.text2).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+            if custom.doc.showNotes {
+                HStack {
+                    Text("已写 \(custom.notedCount) / \(custom.totalApps)").font(.system(size: 11)).foregroundStyle(Theme.text2)
+                    Spacer()
+                    if !custom.doc.notes.isEmpty {
+                        Text("清除全部短评").font(.system(size: 11)).foregroundStyle(Theme.accentHi)
+                            .contentShape(Rectangle()).onTapGesture { custom.clearNotes(); noteKey = nil }
+                    }
+                }
+            }
+        }
         group("文案") {
             field("标题") { TextField("标题", text: $custom.doc.title) }
             field("文案（可留空，可换行）") { TextField("一句话", text: $custom.doc.caption, axis: .vertical).lineLimit(1...3) }

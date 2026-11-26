@@ -89,6 +89,10 @@ struct CustomShareDoc: Codable, Equatable {
     var cornerRadius = 24.0
     /// Title override for the usage-ranking card; empty = automatic.
     var usageTitle = ""
+    /// Lay the card out as "icon + name + one-line note" and show `notes`.
+    var showNotes = false
+    /// One-line comments by app key (bundle id or custom-app key). Kept even if the app leaves every group.
+    var notes: [String: String] = [:]
 
     init() {}
 
@@ -114,6 +118,8 @@ struct CustomShareDoc: Codable, Equatable {
         mode = try c.decodeIfPresent(ShareMode.self, forKey: .mode) ?? d.mode
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
         usageTitle = try c.decodeIfPresent(String.self, forKey: .usageTitle) ?? d.usageTitle
+        showNotes = try c.decodeIfPresent(Bool.self, forKey: .showNotes) ?? d.showNotes
+        notes = try c.decodeIfPresent([String: String].self, forKey: .notes) ?? d.notes
     }
 }
 
@@ -313,6 +319,22 @@ final class CustomShareModel: ObservableObject {
         doc.groups[target].bundleIDs.append(bundleID)
     }
 
+    // MARK: Notes
+
+    func note(for key: String) -> String { doc.notes[key] ?? "" }
+
+    func setNote(_ text: String, for key: String) {
+        let limited = ShareNote.limit(text)
+        if ShareNote.normalize(limited).isEmpty { doc.notes.removeValue(forKey: key) } else { doc.notes[key] = limited }
+    }
+
+    /// Apps currently on the card that have a note.
+    var notedCount: Int {
+        doc.groups.flatMap(\.bundleIDs).filter { !ShareNote.normalize(doc.notes[$0] ?? "").isEmpty }.count
+    }
+
+    func clearNotes() { doc.notes.removeAll() }
+
     // MARK: Custom apps
 
     func customApp(forKey key: String) -> CustomApp? { doc.customApps.first { $0.key == key } }
@@ -348,16 +370,19 @@ final class CustomShareModel: ObservableObject {
     func removeCustom(_ app: CustomApp) {
         doc.customApps.removeAll { $0.id == app.id }
         for i in doc.groups.indices { doc.groups[i].bundleIDs.removeAll { $0 == app.key } }
+        doc.notes.removeValue(forKey: app.key)
         CustomAppIcons.delete(file: app.iconFile)
     }
+
+    private func noteText(_ key: String) -> String { ShareNote.normalize(doc.notes[key] ?? "") }
 
     /// Name and icon for a group entry, whether it is an installed app or a custom one.
     func resolve(_ key: String, catalog: AppCatalog) -> ResolvedApp {
         if let custom = customApp(forKey: key) {
-            return ResolvedApp(id: key, name: custom.name, icon: CustomAppIcons.render(custom))
+            return ResolvedApp(id: key, name: custom.name, icon: CustomAppIcons.render(custom), note: noteText(key))
         }
         let info = catalog.info(for: key)
-        return ResolvedApp(id: key, name: info.name, icon: info.icon)
+        return ResolvedApp(id: key, name: info.name, icon: info.icon, note: noteText(key))
     }
 
     // MARK: Presets

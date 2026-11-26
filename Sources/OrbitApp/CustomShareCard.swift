@@ -1,10 +1,13 @@
 import AppKit
+import OrbitCore
 import SwiftUI
 
 struct ResolvedApp: Identifiable {
     let id: String
     let name: String
     let icon: NSImage
+    /// One-line comment; empty when the user wrote none.
+    var note = ""
 }
 
 struct ResolvedGroup: Identifiable {
@@ -18,6 +21,8 @@ struct ResolvedGroup: Identifiable {
 struct CustomShareCardView: View {
     let doc: CustomShareDoc
     let groups: [ResolvedGroup]
+    /// Editor preview only: tapping an app opens its note popover, and empty notes show a hint.
+    var editing: NoteEditing? = nil
 
     private let pad: CGFloat = 40
     private let topPad: CGFloat = 34
@@ -62,10 +67,14 @@ struct CustomShareCardView: View {
 
     private func content(width w: CGFloat, height h: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            switch doc.template {
-            case .fjord, .paper: header(width: w, centered: false); labeledRows(width: w)
-            case .glass: header(width: w, centered: false); panels(width: w)
-            case .minimal: header(width: w, centered: true); iconField(width: w)
+            if doc.showNotes {
+                header(width: w, centered: false); noteLayout(width: w)
+            } else {
+                switch doc.template {
+                case .fjord, .paper: header(width: w, centered: false); labeledRows(width: w)
+                case .glass: header(width: w, centered: false); panels(width: w)
+                case .minimal: header(width: w, centered: true); iconField(width: w)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -206,6 +215,90 @@ struct CustomShareCardView: View {
         .padding(.top, 6)
     }
 
+    // notes: one column per group, each app as "icon + name + one-line note"
+    private var noteRowHeight: CGFloat { icon + 12 }
+    private let noteGap: CGFloat = 20
+    private let notePanelPad: CGFloat = 14
+
+    private var noteColumnCount: Int { doc.ratio == .landscape ? 3 : 2 }
+
+    /// Groups as they appear in note mode. The minimal template has no groups, so its apps are split evenly into unnamed columns.
+    private var noteSections: [ResolvedGroup] {
+        guard doc.template == .minimal else { return visibleGroups }
+        let all = visibleGroups.flatMap(\.apps)
+        let cols = min(noteColumnCount, max(1, all.count))
+        let per = Int(ceil(Double(all.count) / Double(cols)))
+        return Self.chunks(all, max(1, per)).map { ResolvedGroup(id: UUID(), name: "", apps: $0) }
+    }
+
+    private func noteColumnWidth(width w: CGFloat) -> CGFloat {
+        let cols = min(noteColumnCount, max(1, noteSections.count))
+        let gap = doc.template == .glass ? 12 : noteGap
+        return (w - 2 * pad - CGFloat(cols - 1) * gap) / CGFloat(cols)
+    }
+
+    private func noteLayout(width w: CGFloat) -> some View {
+        let colW = noteColumnWidth(width: w)
+        let gap = doc.template == .glass ? CGFloat(12) : noteGap
+        return VStack(alignment: .leading, spacing: 16) {
+            ForEach(Array(Self.chunks(noteSections, noteColumnCount).enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: gap) {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, g in noteColumn(g, width: colW) }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func noteColumn(_ g: ResolvedGroup, width: CGFloat) -> some View {
+        let column = VStack(alignment: .leading, spacing: 6) {
+            if !g.name.isEmpty {
+                Text(g.name).font(.system(size: 11, weight: .semibold)).tracking(2).foregroundStyle(accent)
+                    .padding(.horizontal, 8).padding(.bottom, 4)
+            }
+            ForEach(g.apps) { noteRow($0) }
+        }
+        if doc.template == .glass {
+            column.padding(notePanelPad).frame(width: width, alignment: .leading)
+                .background(.white.opacity(lightSurface ? 0.5 : 0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(hairline, lineWidth: 0.5))
+        } else {
+            column.frame(width: width, alignment: .leading)
+        }
+    }
+
+    private func noteRow(_ app: ResolvedApp) -> some View {
+        let isEditing = editing?.editingKey == app.id
+        return HStack(spacing: 10) {
+            SharpIcon(app.icon, icon)
+                .shadow(color: .black.opacity(lightSurface ? 0.22 : 0.5), radius: icon * 0.18, y: icon * 0.1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.name).font(.system(size: 12.5, weight: .semibold)).lineLimit(1).foregroundStyle(ink)
+                if !app.note.isEmpty {
+                    Text(app.note).font(.system(size: 11)).lineLimit(1).foregroundStyle(muted)
+                } else if editing != nil {
+                    Text("加一句短评").font(.system(size: 11)).italic().foregroundStyle(muted.opacity(0.45))
+                }
+            }
+            .shadow(color: .black.opacity(lightSurface ? 0 : 0.6), radius: 3, y: 1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8).frame(height: noteRowHeight)
+        .background(isEditing ? accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(isEditing ? accent : .clear, lineWidth: 1.5))
+        .contentShape(Rectangle())
+        .onTapGesture { editing?.select(app.id) }
+        .popover(isPresented: Binding(
+            get: { editing?.editingKey == app.id },
+            set: { if !$0 { editing?.select(nil) } }
+        ), arrowEdge: .bottom) {
+            if let editing {
+                NoteEditorView(name: app.name, text: editing.text(app.id)) { editing.select(nil) }
+            }
+        }
+    }
+
     // MARK: Fit
 
     /// Height the content needs at a given logical width (mirrors the layout above).
@@ -215,6 +308,15 @@ struct CustomShareCardView: View {
         var h = titleH + 8 + (captionLines > 0 ? CGFloat(captionLines) * 19 + 8 : 0) + 20
         if doc.template == .minimal { h += 22 }
         let cellH = cellHeight
+        if doc.showNotes {
+            let glass = doc.template == .glass
+            let sectionH: (ResolvedGroup) -> CGFloat = { g in
+                let n = CGFloat(max(1, g.apps.count))
+                return (g.name.isEmpty ? 0 : 22) + n * self.noteRowHeight + (n - 1) * 6 + (glass ? 2 * self.notePanelPad : 0)
+            }
+            let rows = Self.chunks(noteSections, noteColumnCount).map { $0.map(sectionH).max() ?? 0 }
+            return h + rows.reduce(0, +) + CGFloat(max(0, rows.count - 1)) * 16
+        }
         switch doc.template {
         case .fjord, .paper:
             let cols = columns(forGridWidth: w - 2 * pad - labelW)
