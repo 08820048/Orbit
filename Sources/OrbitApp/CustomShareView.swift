@@ -359,14 +359,18 @@ struct ShareHubView: View {
     @ViewBuilder
     private var pickedLayoutSection: some View {
         group("版式") {
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 ForEach(CustomTemplate.allCases) { t in
-                    Text(t.rawValue).font(.system(size: 11)).foregroundStyle(t == .paper ? Color(hex: 0x2A2620) : .white)
-                        .frame(maxWidth: .infinity, minHeight: 64, alignment: .bottomLeading).padding(7)
-                        .background(thumb(t), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(custom.doc.template == t ? Theme.accent : .clear, lineWidth: 2))
-                        .onTapGesture { custom.doc.template = t }
+                    VStack(spacing: 6) {
+                        templatePreview(t)
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(custom.doc.template == t ? Theme.accent : .clear, lineWidth: 2))
+                        Text(t.rawValue).font(.system(size: 11))
+                            .foregroundStyle(custom.doc.template == t ? Theme.text : Theme.text2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture { custom.doc.template = t }
                 }
             }
             Text(custom.doc.template.blurb).font(.system(size: 11)).foregroundStyle(Theme.text2)
@@ -375,9 +379,26 @@ struct ShareHubView: View {
             ratioGrid(CanvasRatio.basic, detail: { $0.shape })
             Text("社交平台").font(.system(size: 11)).foregroundStyle(Theme.text2)
             ratioGrid(CanvasRatio.platforms, detail: { "\($0.shape) · \($0.pixels)" })
-            Text("当前：\(custom.doc.ratio.rawValue) · \(custom.doc.ratio.pixels)，导出为 2x PNG。软件太多放不下时，卡片会整体缩小。")
-                .font(.system(size: 11)).foregroundStyle(Theme.text2).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// A small live render of the card in template `t`, with the current content, background and notes setting.
+    private func templatePreview(_ t: CustomTemplate) -> some View {
+        var d = custom.doc
+        d.template = t
+        d.ratio = .landscape
+        let size = d.ratio.size
+        return Color.clear
+            .aspectRatio(size.width / size.height, contentMode: .fit)
+            .overlay(
+                GeometryReader { g in
+                    CustomShareCardView(doc: d, groups: groups)
+                        .scaleEffect(g.size.width / size.width, anchor: .topLeading)
+                        .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .allowsHitTesting(false)
     }
 
     private func ratioGrid(_ ratios: [CanvasRatio], detail: @escaping (CanvasRatio) -> String) -> some View {
