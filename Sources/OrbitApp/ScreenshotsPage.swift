@@ -456,11 +456,20 @@ struct PermissionGuide: View {
     }
 
     /// Starts a fresh copy of this app and quits this one: the permission only applies to a new process.
+    /// A packaged app is reopened by its bundle; a bare development binary (no .app around it) is started again directly.
     static func relaunch() {
-        let config = NSWorkspace.OpenConfiguration()
-        config.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+        let bundle = Bundle.main.bundleURL
+        if bundle.pathExtension == "app" {
+            let config = NSWorkspace.OpenConfiguration()
+            config.createsNewApplicationInstance = true
+            NSWorkspace.shared.openApplication(at: bundle, configuration: config) { _, _ in
+                DispatchQueue.main.async { NSApp.terminate(nil) }
+            }
+        } else if let exe = Bundle.main.executableURL {
+            let p = Process()
+            p.executableURL = exe
+            p.arguments = Array(CommandLine.arguments.dropFirst())
+            do { try p.run(); NSApp.terminate(nil) } catch { NSSound.beep() }
         }
     }
 }
