@@ -203,6 +203,31 @@ struct GlassSegmented<T: Hashable>: View {
     }
 }
 
+/// Text tabs with a thin accent underline under the selected one: a lighter second level below a segmented control.
+struct TextTabs<T: Hashable>: View {
+    let options: [T]
+    let label: (T) -> String
+    @Binding var selection: T
+
+    var body: some View {
+        HStack(spacing: 22) {
+            ForEach(options, id: \.self) { option in
+                let on = selection == option
+                Text(label(option))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(on ? Theme.text : Theme.text2)
+                    .frame(height: 26)
+                    .overlay(alignment: .bottom) {
+                        if on { Capsule().fill(Theme.accent).frame(height: 2).offset(y: 2) }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { selection = option } }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
 struct GlassToggle: View {
     @Binding var isOn: Bool
     var body: some View {

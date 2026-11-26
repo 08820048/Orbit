@@ -168,8 +168,12 @@ struct ShareHubView: View {
 
     private var inspector: some View {
         VStack(spacing: 0) {
-            GlassSegmented(options: InspectorTab.allCases, label: \.rawValue, selection: $tab, fill: true)
-                .padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 6)
+            // The source decides everything below it, so it comes first; content / style is a second, lighter level.
+            VStack(alignment: .leading, spacing: 16) {
+                GlassSegmented(options: ShareMode.allCases, label: \.rawValue, selection: $custom.doc.mode, fill: true)
+                TextTabs(options: InspectorTab.allCases, label: \.rawValue, selection: $tab)
+            }
+            .padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 6)
             OScroll {
                 VStack(alignment: .leading, spacing: 24) {
                     if tab == .content { contentPage } else { stylePage }
@@ -186,11 +190,6 @@ struct ShareHubView: View {
 
     @ViewBuilder
     private var contentPage: some View {
-        group("内容来源") {
-            GlassSegmented(options: ShareMode.allCases, label: \.rawValue, selection: $custom.doc.mode, fill: true)
-            Text(mode == .usage ? "用真实的使用时长生成排行、年度报告。" : "自己挑选想展示的软件，分组后生成分享图。")
-                .font(.system(size: 11)).foregroundStyle(Theme.text2)
-        }
         if mode == .usage { usageContentSections } else { pickedContentSections }
     }
 
