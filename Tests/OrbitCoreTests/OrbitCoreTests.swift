@@ -307,10 +307,10 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
 
     @Test func rankingNumbersEntriesAndFormatsDuration() {
         let text = ShareList.ranking(title: "2026 我最常用的 Mac 应用",
-                                     entries: [("Chrome", 48.4 * 3600), ("Zed", 20 * 60)],
+                                     entries: [(name: "Chrome", seconds: 48.4 * 3600), (name: "Zed", seconds: 20.0 * 60)],
                                      showDuration: true, signature: "", watermark: true)
         #expect(text == "2026 我最常用的 Mac 应用\n\n1. Chrome — 48.4 小时\n2. Zed — 20 分钟\n\nOrbit")
-        let bare = ShareList.ranking(title: "T", entries: [("Chrome", 3600)], showDuration: false, signature: "", watermark: false)
+        let bare = ShareList.ranking(title: "T", entries: [(name: "Chrome", seconds: 3600.0)], showDuration: false, signature: "", watermark: false)
         #expect(bare == "T\n\n1. Chrome")
     }
 }
