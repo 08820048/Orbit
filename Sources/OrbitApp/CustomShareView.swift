@@ -670,7 +670,7 @@ struct AppPickerSheet: View {
             }
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
-                    GlassIcon(index: 35, size: 18)
+                    GlassIcon(index: GI.search, size: 18)
                     TextField("搜索软件名称…", text: $query).textFieldStyle(.plain).font(.system(size: 13))
                 }
                 .padding(.horizontal, 12).frame(height: 34)
@@ -687,7 +687,7 @@ struct AppPickerSheet: View {
                 ScrollView {
                     if filter != 1 && (!visibleTools.isEmpty || (filter == 0 && query.isEmpty)) {
                         HStack(spacing: 8) {
-                            GlassIcon(index: 2, size: 20)
+                            GlassIcon(index: GI.terminal, size: 20)
                             Text("检测到的终端工具").font(.system(size: 13, weight: .semibold))
                             Text(custom.detectedTools.isEmpty
                                  ? "没有在命令行里找到常见工具，可用下方「添加自定义软件」按名称添加"

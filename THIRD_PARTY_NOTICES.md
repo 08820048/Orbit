@@ -2,12 +2,16 @@
 
 Orbit 的**代码**以 MIT 许可证发布（见 [LICENSE](LICENSE)）。下面这些随仓库分发的素材不属于 MIT 许可范围，各自遵循自己的许可证。
 
-## Glass 图标包
+## Glass 图标包（不在本仓库中）
 
-- 位置：`Sources/OrbitApp/Resources/GlassIcons/`（App 内使用），`Design/GlassIcons/`、`Design/glass-sprite.png`（原稿）
-- 内容：40 张 Glass 风格的 3D 图标
-- 作者 / 来源：**待补充**
-- 许可证：第三方素材，作者允许再分发。**具体许可证条款待补充**
+- 作者：Vinz（[@hivinz_](https://twitter.com/hivinz_)）
+- 内容：40 张 Glass 风格的 3D 图标。Orbit 官方发布的安装包里用了其中的一部分。
+- 许可证（作者的原文）：
+
+  > License: Free for personal and commercial use. Use the icons in client work, apps, websites and products you sell. Please don't resell or share the icons themselves as an icon pack. Credit is appreciated but not required.
+
+- **图标文件没有放进本仓库。** 许可证允许在 App 里使用，但不允许把图标本身当作图标包再分享，所以公开仓库不包含它们。没有这些文件时，Orbit 会用 SF Symbols 代替，功能完全一样。
+- 如果你有这套图标的合法副本，可以放进 `Sources/OrbitApp/Resources/GlassIcons/`（命名为 `glass-<序号>.png`），这个目录里的 PNG 已被 git 忽略。
 
 ## 内置背景图
 

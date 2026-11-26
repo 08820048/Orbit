@@ -52,7 +52,6 @@ scripts/build-app.sh   # 生成 build/Orbit.app（ad-hoc 签名，仅供本机�
 | `Sources/OrbitApp` | SwiftUI 应用：分享图编辑器、卡片渲染、设置、引导 |
 | `Sources/OrbitCLI` | 开发用命令行 `orbit-cli`：导入数据并打印统计、列出 Dock 软件 |
 | `Tests/OrbitCoreTests` | 核心层的单元测试 |
-| `Design/` | 界面用到的 Glass 图标原稿 |
 | `docs/` | 产品需求文档 |
 
 ## 参与贡献
@@ -61,4 +60,6 @@ scripts/build-app.sh   # 生成 build/Orbit.app（ad-hoc 签名，仅供本机�
 
 ## 许可证
 
-代码以 [MIT](LICENSE) 许可证发布。内置的图标、背景图和品牌 logo 各有各的许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+代码以 [MIT](LICENSE) 许可证发布。内置的背景图和品牌 logo 各有各的许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+官方发布的安装包界面用了 Vinz 设计的 Glass 图标。按作者的许可证，这些图标文件不能放进公开仓库，所以从源码构建时界面图标会换成 SF Symbols，功能完全一样。

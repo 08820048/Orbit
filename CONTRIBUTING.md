@@ -43,6 +43,7 @@ ORBIT_LIGHT=1 ORBIT_FLAT=1 "$BIN" --render-check /tmp/orbit-light  # 浅色
 
 ## 设计约定
 
+- 不要提交 Glass 图标文件（`Resources/GlassIcons/*.png`、`Design/`），它们受作者许可证限制，已被 git 忽略。需要新图标时，先在 `GlassIcons.symbols` 里给它配一个 SF Symbol。
 - 界面扁平、一体化，不加无意义的分割线、描边和渐变装饰；控件（按钮、分段控件、开关）的质感是例外，统一在 `Theme.swift` 里。
 - 完整支持系统深色和浅色模式，颜色用 `Theme` 里随系统外观变化的颜色，不要写死。
 - 分享图里所有视觉选项默认可调，不要写死。

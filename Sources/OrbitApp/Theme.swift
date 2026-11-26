@@ -71,22 +71,49 @@ private enum Blue {
     static let rim = Color.white.opacity(0.14)
 }
 
-/// Indices into the Glass icon pack (file number = index). See Design/GlassIcons.
+/// Indices into the Glass icon pack (file number = index).
+///
+/// The Glass icons are third-party and are NOT part of the open-source repository (see THIRD_PARTY_NOTICES.md).
+/// Without the PNGs in `Resources/GlassIcons/`, every index falls back to an SF Symbol (`GlassIcons.symbols`).
 enum GI {
     static let timer = 13, trend = 14, pie = 34, calendar = 28, stats = 27, orbit = 18
     static let share = 32, gear = 39, layout = 19, shield = 10, megaphone = 16, eye = 1
     static let sliders = 30, tag = 25, background = 22, swap = 29, download = 8, docs = 15
+    static let search = 35, terminal = 2
 }
 
 enum GlassIcons {
     private static var cache: [Int: NSImage] = [:]
 
+    /// SF Symbol standing in for each icon when the Glass PNG is not bundled.
+    static let symbols: [Int: String] = [
+        GI.timer: "timer", GI.trend: "chart.line.uptrend.xyaxis", GI.pie: "chart.pie", GI.calendar: "calendar",
+        GI.stats: "chart.bar", GI.orbit: "atom", GI.share: "square.and.arrow.up", GI.gear: "gearshape",
+        GI.layout: "square.grid.2x2", GI.shield: "checkmark.shield", GI.megaphone: "megaphone", GI.eye: "eye",
+        GI.sliders: "slider.horizontal.3", GI.tag: "tag", GI.background: "photo", GI.swap: "arrow.left.arrow.right",
+        GI.download: "arrow.down.circle", GI.docs: "doc.text", GI.search: "magnifyingglass", GI.terminal: "terminal",
+    ]
+
     static func image(_ index: Int) -> NSImage {
         if let hit = cache[index] { return hit }
         let url = Bundle.module.url(forResource: "glass-\(index)", withExtension: "png", subdirectory: "GlassIcons")
-        let image = url.flatMap(NSImage.init(contentsOf:)) ?? NSImage()
+        let image = url.flatMap(NSImage.init(contentsOf:)) ?? symbolImage(symbols[index] ?? "circle.fill")
         cache[index] = image
         return image
+    }
+
+    /// A blue SF Symbol rasterized into a square so it goes through the same pipeline as the PNG icons.
+    private static func symbolImage(_ name: String) -> NSImage {
+        let side: CGFloat = 256
+        let config = NSImage.SymbolConfiguration(pointSize: 180, weight: .regular)
+            .applying(.init(paletteColors: [NSColor(srgbRed: 0.36, green: 0.62, blue: 1, alpha: 1)]))
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return NSImage() }
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let fit = min(rect.width * 0.82 / symbol.size.width, rect.height * 0.82 / symbol.size.height)
+            let w = symbol.size.width * fit, h = symbol.size.height * fit
+            symbol.draw(in: NSRect(x: (rect.width - w) / 2, y: (rect.height - h) / 2, width: w, height: h))
+            return true
+        }
     }
 }
 

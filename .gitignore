@@ -8,3 +8,7 @@ DerivedData/
 .vscode/
 *.xcuserstate
 .env
+
+# Third-party Glass icons: kept locally for the maintainer's own builds, never committed (see THIRD_PARTY_NOTICES.md)
+Design/
+Sources/OrbitApp/Resources/GlassIcons/*.png
