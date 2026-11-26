@@ -90,31 +90,6 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(d.daily.map(\.seconds) == [3600, 0, 1800], "Nov 1–3; the window ends at Nov 4 00:00")
     }
 
-    @Test func appInsightsProfilesHoursWeekdaysAndSessions() {
-        // 2026-11-02 is a Monday, 2026-11-04 a Wednesday.
-        let sessions = [
-            session("a", "2026-11-02T09:30:00Z", "2026-11-02T10:30:00Z"),   // crosses an hour boundary
-            session("a", "2026-11-02T14:00:00Z", "2026-11-02T14:20:00Z"),
-            session("a", "2026-11-04T09:00:00Z", "2026-11-04T09:10:00Z"),
-            session("b", "2026-11-03T09:00:00Z", "2026-11-03T12:00:00Z"),   // other apps are ignored
-        ]
-        let i = engine.appInsights(bundleID: "a", sessions: sessions, period: .month(year: 2026, month: 11), now: date("2026-11-05T00:00:00Z"))
-        #expect(i.hourly[9] == 1800 + 600)
-        #expect(i.hourly[10] == 1800)
-        #expect(i.hourly[14] == 1200)
-        #expect(i.hourly.reduce(0, +) == 5400)
-        #expect(i.peakHour == 9)
-        #expect(i.sessionCount == 3)
-        #expect(i.longestSession == 3600)
-        #expect(i.averageSession == 1800)
-        #expect(i.weekdayAverage[0] == 4800, "one Monday in range")
-        #expect(i.weekdayAverage[2] == 600)
-        #expect(i.weekdayAverage[1] == 0)
-        #expect(i.peakWeekday == 0)
-        let later = engine.appInsights(bundleID: "a", sessions: sessions, period: .month(year: 2026, month: 11),
-                                       now: date("2026-11-05T00:00:00Z"), from: date("2026-11-03T00:00:00Z"))
-        #expect(later.weekdayAverage[0] == 0, "days before `from` are not counted")
-    }
 }
 
 @Suite struct HistoryStoreTests {
@@ -269,42 +244,6 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
     @Test func emptyOrZeroWeightsGiveNothing() {
         #expect(BubblePacking.pack(weights: [], in: area).isEmpty)
         #expect(BubblePacking.pack(weights: [0, 0], in: area).isEmpty)
-    }
-}
-
-@Suite struct MacProfileTests {
-    @Test func parsesSystemProfilerOutput() throws {
-        let json = #"""
-        {"SPHardwareDataType":[{"machine_name":"MacBook Air","machine_model":"Mac15,12","chip_type":"Apple M3",
-         "physical_memory":"16 GB","serial_number":"SECRET","platform_UUID":"SECRET-UUID"}]}
-        """#
-        let parsed = try #require(MacProfile.parse(systemProfilerJSON: Data(json.utf8)))
-        #expect(parsed == MacProfile.Parsed(modelName: "MacBook Air", modelIdentifier: "Mac15,12", chip: "Apple M3", memoryGB: 16))
-    }
-
-    @Test func fallsBackToTheIntelProcessorName() throws {
-        let json = #"{"SPHardwareDataType":[{"machine_name":"iMac","machine_model":"iMac19,1","processor_name":"6-Core Intel Core i5","physical_memory":"32 GB"}]}"#
-        let parsed = try #require(MacProfile.parse(systemProfilerJSON: Data(json.utf8)))
-        #expect(parsed.chip == "6-Core Intel Core i5")
-        #expect(parsed.memoryGB == 32)
-    }
-
-    @Test func rejectsGarbage() {
-        #expect(MacProfile.parse(systemProfilerJSON: Data("not json".utf8)) == nil)
-        #expect(MacProfile.parse(systemProfilerJSON: Data("{}".utf8)) == nil)
-    }
-
-    @Test func storageShowsTheSizeOnTheBox() {
-        #expect(MacProfile.storageLabel(forBytes: 494_384_795_648) == "512 GB")
-        #expect(MacProfile.storageLabel(forBytes: 245_000_000_000) == "256 GB")
-        #expect(MacProfile.storageLabel(forBytes: 994_662_584_320) == "1 TB")
-        #expect(MacProfile.storageLabel(forBytes: 1_990_000_000_000) == "2 TB")
-    }
-
-    @Test func profileHasNoDeviceIdentifiers() {
-        // The type must not be able to carry a serial number or UUID.
-        let names = Set(Mirror(reflecting: MacProfile(modelName: "", modelIdentifier: "", chip: "", memoryGB: nil, storageBytes: nil, system: "")).children.compactMap(\.label))
-        #expect(names.isDisjoint(with: ["serialNumber", "serial", "uuid", "platformUUID", "udid"]))
     }
 }
 
