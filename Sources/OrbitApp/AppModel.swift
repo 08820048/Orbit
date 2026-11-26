@@ -5,13 +5,13 @@ import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
-    enum Section: Hashable { case share, settings }
+    enum Section: Hashable { case screenshots, share, settings }
 
     enum Period: String, CaseIterable {
         case year = "年", month = "月", week = "周"
     }
 
-    @Published var section: Section = .share
+    @Published var section: Section = .screenshots
     @Published var period: Period = .year { didSet { recompute() } }
     @Published var access: ScreenTimeReader.Access = .unavailable
     @Published var summary: PeriodSummary?
@@ -31,6 +31,10 @@ final class AppModel: ObservableObject {
     let catalog = AppCatalog()
     let custom = CustomShareModel()
     let updater = UpdateModel()
+    let captureSettings: CaptureSettings
+    let capture: CaptureCoordinator
+    /// The screenshot open in the detail view, if any.
+    @Published var openShot: ScreenshotRecord?
     /// Layout choices of the usage-ranking share card (session-only; the shared look lives in `custom.doc`).
     @Published var dataStyle = ShareStyle()
     private(set) var monitor: ForegroundMonitor?
@@ -38,7 +42,12 @@ final class AppModel: ObservableObject {
     private var terminateObserver: NSObjectProtocol?
 
     init() {
-        hasOnboarded = UserDefaults.standard.bool(forKey: "orbit.onboarded")
+        // The Full Disk Access guide no longer blocks the first launch: screenshots need a different permission,
+        // and usage data explains its own when the user opens it.
+        hasOnboarded = true
+        let shotSettings = CaptureSettings()
+        captureSettings = shotSettings
+        capture = CaptureCoordinator(settings: shotSettings)
         do { store = try HistoryStore() } catch {
             // Disk store unavailable: keep working in memory rather than crash.
             store = try! HistoryStore(url: nil)
@@ -49,6 +58,10 @@ final class AppModel: ObservableObject {
         if hasOnboarded { startMonitor() }
         recompute()
         Task { await refresh() }
+        capture.onNeedPermission = { [weak self] in
+            self?.section = .screenshots
+            WindowOpener.shared.showMain()
+        }
     }
 
     // MARK: Dock

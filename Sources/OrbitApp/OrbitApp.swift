@@ -7,7 +7,9 @@ import SwiftUI
 /// started from a terminal or by a tool that does not activate it.
 final class OrbitAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
+        // Orbit lives in the menu bar: with the Dock icon hidden it is an accessory app.
+        let showDock = UserDefaults.standard.object(forKey: "orbit.showDock") as? Bool ?? true
+        NSApp.setActivationPolicy(showDock ? .regular : .accessory)
         NSApp.activate(ignoringOtherApps: true)
         // The SwiftUI window may not exist yet: make it key as soon as it does.
         DispatchQueue.main.async { Self.focusMainWindow() }
@@ -16,10 +18,58 @@ final class OrbitAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) { Self.focusMainWindow() }
 
+    /// Closing the window must not quit: the shortcuts and the menu bar icon keep working.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { MainActor.assumeIsolated { WindowOpener.shared.showMain() } }
+        return true
+    }
+
     static func focusMainWindow() {
-        guard let window = NSApp.windows.first(where: { $0.canBecomeKey && $0.isVisible }), !window.isKeyWindow else { return }
+        // Never fight the selection overlay for the key window.
+        if NSApp.windows.contains(where: { $0 is OverlayWindow && $0.isVisible }) { return }
+        guard let window = NSApp.windows.first(where: { $0.canBecomeKey && $0.isVisible && $0.level == .normal }), !window.isKeyWindow else { return }
         window.makeKeyAndOrderFront(nil)
     }
+}
+
+/// Brings the main window back (or opens a new one) from anywhere: the menu bar, a shortcut, a permission problem.
+@MainActor
+final class WindowOpener {
+    static let shared = WindowOpener()
+    /// Set by a view that has access to SwiftUI's `openWindow`.
+    var open: (() -> Void)?
+
+    func showMain() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let w = NSApp.windows.first(where: { $0.canBecomeKey && $0.level == .normal && $0.styleMask.contains(.titled) && !($0 is NSPanel) }) {
+            w.makeKeyAndOrderFront(nil)
+        } else {
+            open?()
+        }
+    }
+}
+
+/// The menu bar glyph: a planet with its orbit, drawn as a template image so it follows the menu bar colours.
+enum MenuBarIcon {
+    static let image: NSImage = {
+        let img = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
+            let ring = NSBezierPath(ovalIn: NSRect(x: -8.6, y: -3.1, width: 17.2, height: 6.2))
+            ring.lineWidth = 1.35
+            let place = NSAffineTransform()
+            place.translateX(by: 10, yBy: 9)
+            place.rotate(byDegrees: 26)
+            ring.transform(using: place as AffineTransform)
+            ring.stroke()
+            NSBezierPath(ovalIn: NSRect(x: 5.6, y: 4.6, width: 8.8, height: 8.8)).fill()
+            return true
+        }
+        img.isTemplate = true
+        return img
+    }()
 }
 
 @main
@@ -28,7 +78,7 @@ struct OrbitApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("Orbit") {
+        WindowGroup("Orbit", id: "main") {
             RootView()
                 .environmentObject(model)
                 .frame(minWidth: 1080, minHeight: 720)
@@ -43,6 +93,53 @@ struct OrbitApp: App {
             CommandGroup(after: .newItem) {
                 Button("刷新数据") { Task { await model.refresh() } }.keyboardShortcut("r")
             }
+        }
+
+        MenuBarExtra {
+            MenuBarContent().environmentObject(model)
+        } label: {
+            MenuBarLabel()
+        }
+        .menuBarExtraStyle(.menu)
+    }
+}
+
+private struct MenuBarLabel: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Image(nsImage: MenuBarIcon.image)
+            .onAppear { WindowOpener.shared.open = { openWindow(id: "main") } }
+    }
+}
+
+/// The menu under the menu bar icon.
+private struct MenuBarContent: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        let s = model.captureSettings
+        ForEach([CaptureAction.region, .window, .fullscreen], id: \.self) { action in
+            item(action.title, action: action, combo: s.combo(action))
+        }
+        Menu("延时截图") {
+            ForEach([3, 5, 10], id: \.self) { sec in
+                Button("\(sec) 秒") { s.delaySeconds = sec; model.capture.perform(.delayed, fromUI: true) }
+            }
+        }
+        Divider()
+        Button("打开 Orbit") { WindowOpener.shared.showMain() }.keyboardShortcut("o")
+        Button("设置…") { model.section = .settings; WindowOpener.shared.showMain() }.keyboardShortcut(",")
+        Button("检查更新…") { model.updater.checkForUpdates() }
+        Divider()
+        Button("退出 Orbit") { NSApp.terminate(nil) }.keyboardShortcut("q")
+    }
+
+    @ViewBuilder
+    private func item(_ title: String, action: CaptureAction, combo: KeyCombo) -> some View {
+        if let shortcut = combo.shortcut {
+            Button(title) { model.capture.perform(action, fromUI: true) }.keyboardShortcut(shortcut)
+        } else {
+            Button(title) { model.capture.perform(action, fromUI: true) }
         }
     }
 }
@@ -88,6 +185,7 @@ struct MainView: View {
             TopBar()
             Group {
                 switch model.section {
+                case .screenshots: ScreenshotsPage()
                 case .share: ShareHubView(custom: model.custom)
                 case .settings: SettingsView()
                 }
@@ -109,7 +207,7 @@ struct TopBar: View {
     @EnvironmentObject var model: AppModel
 
     private static let items: [(title: String, icon: Int, section: AppModel.Section)] = [
-        ("分享", GI.share, .share), ("设置", GI.gear, .settings),
+        ("截图", GI.capture, .screenshots), ("分享", GI.share, .share), ("设置", GI.gear, .settings),
     ]
 
     var body: some View {
@@ -137,6 +235,43 @@ struct TopBar: View {
 /// `Orbit --render-check <dir>`: writes the three templates as PNGs and exits. Used for verification.
 @MainActor
 enum RenderCheck {
+    /// With `ORBIT_SAMPLE_SHOTS=1` (and `ORBIT_STORE_PATH` pointing at a throwaway index) fills the library with made-up
+    /// screenshots in a temp folder, so the screenshot pages can be rendered. Returns the first one.
+    static func seedSampleScreenshots(_ model: AppModel) -> ScreenshotRecord? {
+        guard ProcessInfo.processInfo.environment["ORBIT_SAMPLE_SHOTS"] != nil,
+              ProcessInfo.processInfo.environment["ORBIT_STORE_PATH"] != nil else { return nil }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("orbit-sample-shots", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let palettes: [(NSColor, NSColor)] = [
+            (NSColor(srgbRed: 0.17, green: 0.23, blue: 0.55, alpha: 1), NSColor(srgbRed: 0.42, green: 0.25, blue: 0.63, alpha: 1)),
+            (NSColor(srgbRed: 0.06, green: 0.36, blue: 0.42, alpha: 1), NSColor(srgbRed: 0.11, green: 0.54, blue: 0.54, alpha: 1)),
+            (NSColor(srgbRed: 0.48, green: 0.23, blue: 0.37, alpha: 1), NSColor(srgbRed: 0.76, green: 0.35, blue: 0.35, alpha: 1)),
+            (NSColor(srgbRed: 0.12, green: 0.16, blue: 0.27, alpha: 1), NSColor(srgbRed: 0.23, green: 0.31, blue: 0.48, alpha: 1)),
+        ]
+        let kinds: [CaptureKind] = [.region, .window, .region, .fullscreen, .window, .region, .window, .region, .fullscreen]
+        let apps = ["Safari", "Xcode", "Figma", "Terminal"]
+        var first: ScreenshotRecord?
+        let now = Date()
+        for i in 0..<9 {
+            let size = NSSize(width: 812, height: 536)
+            let (a, b) = palettes[i % palettes.count]
+            let img = NSImage(size: size, flipped: false) { rect in
+                NSGradient(starting: a, ending: b)?.draw(in: rect, angle: 315)
+                NSColor.white.withAlphaComponent(0.14).setFill()
+                for k in 0..<4 { NSBezierPath(roundedRect: NSRect(x: 28, y: rect.height - 70 - CGFloat(k) * 60, width: CGFloat(300 + (i * 40 + k * 70) % 380), height: 34), xRadius: 8, yRadius: 8).fill() }
+                return true
+            }
+            guard let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                  let record = try? CaptureService.save(cg, kind: kinds[i], source: kinds[i] == .window ? apps[i % apps.count] : nil, scale: 1,
+                                                        format: .png, folder: folder, date: now.addingTimeInterval(-Double(i) * 5400 - (i > 4 ? 86_400 : 0))) else { continue }
+            try? model.capture.store.add(record)
+            if first == nil { first = record }
+        }
+        model.capture.needsPermission = false
+        model.capture.libraryChanged()
+        return first
+    }
+
     /// `ORBIT_LIGHT=1` renders the screens in light mode (default: dark).
     static var isLight: Bool { ProcessInfo.processInfo.environment["ORBIT_LIGHT"] != nil }
     static var scheme: ColorScheme { isLight ? .light : .dark }
@@ -157,7 +292,8 @@ enum RenderCheck {
                              averageSeconds: s.averagePerActiveDay, longestDay: s.longestDay, appCount: s.appCount,
                              share: (s.topApps.first?.seconds ?? 0) / max(s.totalSeconds, 1), entries: Array(entries))
         // Whole-window renders of each screen, for visual verification without touching the desktop.
-        for (name, section) in [("share", AppModel.Section.share), ("settings", .settings)] {
+        let sampleShots = RenderCheck.seedSampleScreenshots(model)
+        for (name, section) in [("share", AppModel.Section.share), ("settings", .settings), ("screenshots", .screenshots)] {
             model.hasOnboarded = true
             model.section = section
             model.custom.doc.mode = .usage
@@ -166,6 +302,16 @@ enum RenderCheck {
             if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
                 try? png.write(to: dir.appendingPathComponent("screen-\(name).png"))
             }
+        }
+        if let first = sampleShots {
+            model.openShot = first
+            model.section = .screenshots
+            let r = ImageRenderer(content: RootView().environmentObject(model).frame(width: 1280, height: 800).environment(\.colorScheme, RenderCheck.scheme))
+            r.scale = 2
+            if let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+                try? png.write(to: dir.appendingPathComponent("screen-screenshot-detail.png"))
+            }
+            model.openShot = nil
         }
         model.hasOnboarded = false
         let ob = ImageRenderer(content: RootView().environmentObject(model).frame(width: 860, height: 580).environment(\.colorScheme, RenderCheck.scheme))

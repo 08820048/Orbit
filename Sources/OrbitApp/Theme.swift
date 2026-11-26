@@ -80,6 +80,8 @@ enum GI {
     static let share = 32, gear = 39, layout = 19, shield = 10, megaphone = 16, eye = 1
     static let sliders = 30, tag = 25, background = 22, swap = 29, download = 8, docs = 15
     static let search = 35, terminal = 2
+    /// Not in the Glass pack: always an SF Symbol.
+    static let capture = 100
 }
 
 enum GlassIcons {
@@ -91,7 +93,7 @@ enum GlassIcons {
         GI.stats: "chart.bar", GI.orbit: "atom", GI.share: "square.and.arrow.up", GI.gear: "gearshape",
         GI.layout: "square.grid.2x2", GI.shield: "checkmark.shield", GI.megaphone: "megaphone", GI.eye: "eye",
         GI.sliders: "slider.horizontal.3", GI.tag: "tag", GI.background: "photo", GI.swap: "arrow.left.arrow.right",
-        GI.download: "arrow.down.circle", GI.docs: "doc.text", GI.search: "magnifyingglass", GI.terminal: "terminal",
+        GI.download: "arrow.down.circle", GI.docs: "doc.text", GI.search: "magnifyingglass", GI.terminal: "terminal", GI.capture: "camera.viewfinder",
     ]
 
     static func image(_ index: Int) -> NSImage {

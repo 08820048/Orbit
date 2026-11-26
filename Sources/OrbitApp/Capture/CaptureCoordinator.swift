@@ -27,7 +27,9 @@ final class CaptureCoordinator: ObservableObject {
 
     init(settings: CaptureSettings) {
         self.settings = settings
-        store = (try? ScreenshotStore()) ?? (try! ScreenshotStore(url: nil))
+        // ORBIT_STORE_PATH points the index somewhere else: used by the offscreen render check, never touches real data.
+        let storeURL = ProcessInfo.processInfo.environment["ORBIT_STORE_PATH"].map { URL(fileURLWithPath: $0) } ?? ScreenshotStore.defaultURL
+        store = (try? ScreenshotStore(url: storeURL)) ?? (try! ScreenshotStore(url: nil))
         registerHotKeys()
         settings.$combos.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.registerHotKeys() } }.store(in: &bag)
         try? store.reconcile()
@@ -49,7 +51,7 @@ final class CaptureCoordinator: ObservableObject {
 
     // MARK: Taking a screenshot
 
-    func perform(_ action: CaptureAction, delay: Int? = nil) {
+    func perform(_ action: CaptureAction, fromUI: Bool = false, delay: Int? = nil) {
         guard !running else { return }
         guard ScreenPermission.granted else {
             ScreenPermission.request()
@@ -59,12 +61,17 @@ final class CaptureCoordinator: ObservableObject {
         }
         needsPermission = false
         running = true
-        Task { await run(action, delay: delay ?? settings.delaySeconds) }
+        Task { await run(action, fromUI: fromUI, delay: delay ?? settings.delaySeconds) }
     }
 
-    private func run(_ action: CaptureAction, delay: Int) async {
+    private func run(_ action: CaptureAction, fromUI: Bool, delay: Int) async {
         defer { if overlay == nil { running = false } }
         do {
+            if fromUI {
+                // Started from a button or menu: get Orbit's own windows out of the picture first.
+                NSApp.hide(nil)
+                try? await Task.sleep(nanoseconds: 350_000_000)
+            }
             if action == .delayed {
                 guard await CountdownHUD.run(seconds: delay) else { return }
             }
@@ -140,6 +147,9 @@ final class CaptureCoordinator: ObservableObject {
     }
 
     // MARK: Library
+
+    /// Tells views to reload (used after the index was changed from outside this class).
+    func libraryChanged() { libraryVersion += 1 }
 
     func records(kind: CaptureKind?, search: String) -> [ScreenshotRecord] {
         (try? store.records(kind: kind, search: search)) ?? []

@@ -10,6 +10,9 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("设置").font(.system(size: 38, weight: .bold))
 
+                CaptureSettingsSections(settings: model.captureSettings, capture: model.capture)
+                    .padding(.top, 30)
+
                 group("数据与隐私") {
                     VStack(alignment: .leading, spacing: 12) {
                         line("数据来源", "屏幕使用时间（本机），加上 Orbit 自己的前台应用记录")
@@ -31,7 +34,7 @@ struct SettingsView: View {
                     }
                     .padding(.top, 4)
                 }
-                .padding(.top, 30)
+                .padding(.top, 38)
 
                 group("更新") { UpdateSection(updater: model.updater) }
                     .padding(.top, 38)

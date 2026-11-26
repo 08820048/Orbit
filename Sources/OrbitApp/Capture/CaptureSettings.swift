@@ -52,6 +52,18 @@ struct KeyCombo: Codable, Equatable {
         kVK_ANSI_Period: ".", kVK_ANSI_Slash: "/", kVK_ANSI_Semicolon: ";", kVK_ANSI_Quote: "'", kVK_ANSI_Backslash: "\\",
     ]
     static func keyName(_ code: UInt32) -> String { names[Int(code)] ?? "?" }
+
+    /// For showing the shortcut next to a menu item (single-character keys only).
+    var shortcut: KeyboardShortcut? {
+        let name = Self.keyName(keyCode)
+        guard name.count == 1, let ch = name.lowercased().first else { return nil }
+        var m: SwiftUI.EventModifiers = []
+        if modifiers & Self.control != 0 { m.insert(.control) }
+        if modifiers & Self.option != 0 { m.insert(.option) }
+        if modifiers & Self.shift != 0 { m.insert(.shift) }
+        if modifiers & Self.command != 0 { m.insert(.command) }
+        return KeyboardShortcut(KeyEquivalent(ch), modifiers: m)
+    }
 }
 
 /// What a global shortcut does.
