@@ -271,14 +271,16 @@ struct ShareHubView: View {
     @ViewBuilder
     private var usageLayoutSection: some View {
         group("版式") {
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 ForEach(ShareTemplate.allCases) { t in
-                    Text(t.rawValue).font(.system(size: 11)).foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 64, alignment: .bottomLeading).padding(7)
-                        .background(usageThumb(t), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(model.dataStyle.template == t ? Theme.accent : .clear, lineWidth: 2))
-                        .onTapGesture { model.dataStyle.template = t }
+                    VStack(spacing: 6) {
+                        usageTemplatePreview(t)
+                        Text(t.rawValue).font(.system(size: 11))
+                            .foregroundStyle(model.dataStyle.template == t ? Theme.text : Theme.text2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.dataStyle.template = t }
                 }
             }
             row("尺寸") { Text(model.dataStyle.template.ratio).foregroundStyle(Theme.text2) }
@@ -292,6 +294,28 @@ struct ShareHubView: View {
         case .report: AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x0F2C66), Color(hex: 0x0A1B44)], startPoint: .topTrailing, endPoint: .bottomLeading))
         case .bubbles: AnyShapeStyle(Color(hex: 0x3A3D47))
         }
+    }
+
+    /// A small live render of the ranking card in layout `t` with the current data and look, drawn at its real shape
+    /// (portrait, square…) and fitted into a fixed slot so the four tiles line up.
+    private func usageTemplatePreview(_ t: ShareTemplate) -> some View {
+        var style = usageStyle
+        style.template = t
+        let data = usageData
+        let size = t.size
+        let selected = model.dataStyle.template == t
+        return GeometryReader { g in
+            let scale = min(g.size.width / size.width, g.size.height / size.height)
+            let w = size.width * scale, h = size.height * scale
+            ShareCardView(style: style, data: data)
+                .scaleEffect(scale, anchor: .topLeading)
+                .frame(width: w, height: h, alignment: .topLeading)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(selected ? Theme.accent : .clear, lineWidth: 2))
+                .frame(width: g.size.width, height: g.size.height)
+        }
+        .frame(height: 84)
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder
