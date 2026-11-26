@@ -1,25 +1,34 @@
 # Orbit
 
-**把你在 Mac 上用的软件，做成好看、可以直接分享的图。**
+**一款本地优先的 Mac 截图工具，为分享而生。**
 
-*Orbit is a local-first macOS app that turns the software you use into a beautiful, shareable image — a ranking from real usage data, or a hand-picked "my apps" card. Nothing is uploaded.*
+*Orbit is a local-first screenshot tool for macOS — menu-bar app, global shortcuts, every capture saved to a library you own. It can also turn the software you use into a shareable card. Nothing is uploaded.*
 
 ## 功能
 
-Orbit 只做一件事：生成「我的 Mac 软件」分享图。
+### 截图（主要功能）
+
+- **四种捕获**：区域、窗口、全屏、延时。区域和窗口选择时会冻结屏幕，菜单、悬停状态也能截。
+- **菜单栏常驻 + 全局快捷键**：默认 ⌃⇧4 区域、⌃⇧5 窗口、⌃⇧3 全屏、⌃⇧6 延时（避开了系统自带的 ⌘⇧3/4/5），可以自定义。
+- **截图库**：**每一张截图都保存**在 `~/Pictures/Orbit`（可改），文件名以 `Orbit` 开头；「截图」页按日期分组展示，可搜索、按方式筛选，点开看大图和详细信息。
+- **快速浮窗**：截完后角落出现缩略图，可复制、在 Finder 中显示、分享、删除，也可以直接拖进别的应用。
+- 删除走废纸篓；你在 Finder 里自己删文件，截图库会自动同步。
+
+标注、美化等功能正在开发中，路线图见 [docs/PRD.md](docs/PRD.md)。
+
+### 软件分享
+
+把你在 Mac 上用的软件，做成好看、可以直接分享的图：
 
 - **数据排行**：用真实的使用时长生成排行榜、卡片、年度报告、气泡图。可选年 / 月 / 周。
-- **自选软件**：从已安装软件、Dock、终端工具（Claude Code、Codex CLI 等）里挑，分组摆放。四种版式：峡湾、玻璃、纸感、极简。
-- **软件短评**：给每个软件配一句话，说说为什么用它。
-- **高度可调**：背景（纯色、渐变、内置图片、自选图片、毛玻璃）、圆角、尺寸（含小红书、X、手机壁纸预设）、署名、水印、标题字体、图标大小。
-- **导出**：存为 2x PNG、拷贝到剪贴板、系统分享菜单；还能把软件名复制成文字清单（Markdown 列表，可带话题标签）。
-
-产品定位和范围边界见 [docs/PRD.md](docs/PRD.md)。
+- **自选软件**：从已安装软件、Dock、终端工具里挑，分组摆放；四种版式：峡湾、玻璃、纸感、极简；还可以给每个软件配一句短评。
+- **导出**：2x PNG、剪贴板、系统分享菜单；可复制成文字清单（Markdown，可带话题标签）；尺寸预设含小红书、X、手机壁纸。
 
 ## 隐私
 
 - 所有数据只在本机处理，**不上传、不生成在线链接**。
 - 除检查更新外，Orbit 不联网。更新检查（Sparkle）只请求一份版本信息，不发送任何使用数据，也不发送系统信息；可以在设置里关掉自动检查。
+- 截图需要 **屏幕录制** 权限（首次使用时引导）。Orbit 只在你按下快捷键时截图，截图只保存在你的这台 Mac 上。
 - 「数据排行」读取 macOS 的屏幕使用时间数据库（`knowledgeC.db`），需要授予 **完全磁盘访问权限**。不授权也能用：Orbit 会从授权那一刻起，用 `NSWorkspace` 自己记录前台应用。
 - 屏幕使用时间只保留约 3 周，Orbit 会把读到的记录存进自己的本地历史库（`~/Library/Application Support/Orbit`），这样才能做年度统计。设置里可以随时清除。
 - 「自选软件」不需要任何特殊权限。
@@ -49,8 +58,8 @@ scripts/build-app.sh   # 生成 build/Orbit.app（ad-hoc 签名，仅供本机�
 
 | 目录 | 内容 |
 | ---- | ---- |
-| `Sources/OrbitCore` | 与界面无关的核心：读取屏幕使用时间、本地历史库、统计、气泡排布、Dock 读取、清单文本生成 |
-| `Sources/OrbitApp` | SwiftUI 应用：分享图编辑器、卡片渲染、设置、引导 |
+| `Sources/OrbitCore` | 与界面无关的核心：截图库索引与命名、读取屏幕使用时间、本地历史库、统计、气泡排布、Dock 读取、清单文本生成 |
+| `Sources/OrbitApp` | SwiftUI 应用：截图（ScreenCaptureKit 捕获、选择覆盖层、全局快捷键、截图库）、分享图编辑器、设置 |
 | `Sources/OrbitCLI` | 开发用命令行 `orbit-cli`：导入数据并打印统计、列出 Dock 软件 |
 | `Tests/OrbitCoreTests` | 核心层的单元测试 |
 | `docs/` | 产品需求文档 |
