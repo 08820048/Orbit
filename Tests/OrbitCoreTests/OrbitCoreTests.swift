@@ -276,3 +276,32 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(ShareNote.normalize("   ").isEmpty)
     }
 }
+
+@Suite struct ShareListTests {
+    @Test func pickedListsGroupsWithNotesAndSkipsEmptyOnes() {
+        let text = ShareList.picked(
+            title: "我的 Mac 常用软件",
+            groups: [
+                .init(name: "AI 与开发", items: [.init(name: "Alma", note: "日常对话的主力"), .init(name: "Zed")]),
+                .init(name: "空分组", items: []),
+            ],
+            signature: "Xuyi · 2026.11", watermark: true)
+        #expect(text == "我的 Mac 常用软件\n\nAI 与开发\n- Alma — 日常对话的主力\n- Zed\n\nXuyi · 2026.11 · Orbit")
+    }
+
+    @Test func footerFollowsSignatureAndWatermark() {
+        #expect(ShareList.footer(signature: "", watermark: false) == nil)
+        #expect(ShareList.footer(signature: " Xuyi ", watermark: false) == "Xuyi")
+        #expect(ShareList.footer(signature: "", watermark: true) == "Orbit")
+        #expect(!ShareList.picked(title: "T", groups: [], signature: "", watermark: false).contains("Orbit"))
+    }
+
+    @Test func rankingNumbersEntriesAndFormatsDuration() {
+        let text = ShareList.ranking(title: "2026 我最常用的 Mac 应用",
+                                     entries: [("Chrome", 48.4 * 3600), ("Zed", 20 * 60)],
+                                     showDuration: true, signature: "", watermark: true)
+        #expect(text == "2026 我最常用的 Mac 应用\n\n1. Chrome — 48.4 小时\n2. Zed — 20 分钟\n\nOrbit")
+        let bare = ShareList.ranking(title: "T", entries: [("Chrome", 3600)], showDuration: false, signature: "", watermark: false)
+        #expect(bare == "T\n\n1. Chrome")
+    }
+}

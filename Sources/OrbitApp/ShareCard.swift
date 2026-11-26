@@ -210,7 +210,7 @@ struct ShareCardView: View {
         }
     }
 
-    private var rankedTitle: String {
+    var rankedTitle: String {
         if !style.title.isEmpty { return style.title }
         switch data.periodTitle {
         case let t where t.hasPrefix("最近"): return "\(t)\n我最常用的 Mac 应用"

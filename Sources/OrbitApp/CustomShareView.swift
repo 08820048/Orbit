@@ -86,6 +86,7 @@ struct ShareHubView: View {
             Text(captionText).font(.system(size: 11)).foregroundStyle(Theme.text2).lineLimit(1)
             Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
             Button("分享…") { shareWithSystem() }.glassButton().disabled(!canExport).background(ShareAnchorView(anchor: shareAnchor))
+            Button("复制清单") { copyList() }.glassButton().disabled(!canExport).help("把软件名复制成文字，和图一起发")
             Button { copy() } label: {
                 HStack(spacing: 8) { Text("拷贝图片"); Text("⌘C").font(.system(size: 12)).opacity(0.7) }
             }
@@ -506,6 +507,28 @@ struct ShareHubView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setData(data, forType: .png)
         flash("已拷贝到剪贴板")
+    }
+
+    /// The app names as text (Markdown-style list), for pasting next to the image.
+    private func copyList() {
+        let text: String
+        if mode == .usage {
+            let style = usageStyle, data = usageData
+            let shown = style.template == .bubbles ? style.bubbleCount : style.topN
+            let title = ShareCardView(style: style, data: data).rankedTitle.replacingOccurrences(of: "\n", with: " ")
+            text = ShareList.ranking(title: title, entries: data.entries.prefix(shown).map { ($0.name, $0.seconds) },
+                                     showDuration: style.showHours, signature: style.signature, watermark: style.watermark)
+        } else {
+            let d = custom.doc
+            text = ShareList.picked(
+                title: d.title,
+                groups: groups.map { g in .init(name: g.name, items: g.apps.map { .init(name: $0.name, note: d.showNotes ? $0.note : "") }) },
+                signature: d.signature, watermark: d.watermark)
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        let count = mode == .usage ? min(usageData.entries.count, usageStyle.template == .bubbles ? usageStyle.bubbleCount : usageStyle.topN) : custom.totalApps
+        flash("已复制软件清单 · \(count) 个软件")
     }
 
     private func save() {
