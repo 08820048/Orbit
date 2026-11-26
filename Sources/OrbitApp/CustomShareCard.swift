@@ -84,7 +84,7 @@ struct CustomShareCardView: View {
 
     // MARK: Pieces
 
-    private var titleSize: CGFloat { doc.ratio == .landscape ? 32 : 28 }
+    private var titleSize: CGFloat { doc.ratio.isWide ? 32 : 28 }
 
     private func header(width: CGFloat, centered: Bool, title: String? = nil, caption: String? = nil) -> some View {
         let title = title ?? doc.title, caption = caption ?? doc.caption
@@ -149,7 +149,7 @@ struct CustomShareCardView: View {
     /// Icons per row. Starts at 6 (landscape) / 4, but grows to fit the biggest group on one row, as far as the width allows;
     /// only then does a group wrap onto a second row.
     private func columns(forGridWidth gw: CGFloat) -> Int {
-        let base = doc.ratio == .landscape ? 6 : 4
+        let base = doc.ratio.isWide ? 6 : 4
         let widest = visibleGroups.map(\.apps.count).max() ?? 0
         let fit = max(1, Int(gw / (icon + 22)))
         return max(1, min(max(base, widest), fit))
@@ -176,7 +176,7 @@ struct CustomShareCardView: View {
     }
 
     // glass: one frosted panel per group
-    private func panelColumns() -> Int { doc.ratio == .landscape ? 3 : 2 }
+    private func panelColumns() -> Int { doc.ratio.isWide ? 3 : 2 }
 
     private func panels(width w: CGFloat) -> some View {
         let pc = panelColumns(), gap: CGFloat = 12
@@ -206,7 +206,7 @@ struct CustomShareCardView: View {
     }
 
     // minimal: every icon in one centered field
-    private func fieldColumns() -> Int { doc.ratio == .landscape ? 8 : 6 }
+    private func fieldColumns() -> Int { doc.ratio.isWide ? 8 : 6 }
 
     private func iconField(width w: CGFloat) -> some View {
         let all = visibleGroups.flatMap(\.apps)
@@ -226,7 +226,7 @@ struct CustomShareCardView: View {
     private let noteGap: CGFloat = 20
     private let notePanelPad: CGFloat = 14
 
-    private var noteColumnCount: Int { doc.ratio == .landscape ? 3 : 2 }
+    private var noteColumnCount: Int { doc.ratio.isWide ? 3 : 2 }
 
     /// Groups as they appear in note mode. The minimal template has no groups, so its apps are split evenly into unnamed columns.
     private var noteSections: [ResolvedGroup] {

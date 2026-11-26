@@ -289,6 +289,15 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(text == "我的 Mac 常用软件\n\nAI 与开发\n- Alma — 日常对话的主力\n- Zed\n\nXuyi · 2026.11 · Orbit")
     }
 
+    @Test func hashtagsGoOnTheLastLineAndAreSkippedWhenEmpty() {
+        let groups: [ShareList.Group] = [.init(name: "G", items: [.init(name: "A")])]
+        #expect(ShareList.picked(title: "T", groups: groups, signature: "Xuyi", watermark: true, hashtags: " #Mac ")
+                == "T\n\nG\n- A\n\nXuyi · Orbit\n#Mac")
+        #expect(ShareList.picked(title: "T", groups: groups, signature: "", watermark: false, hashtags: "#Mac")
+                == "T\n\nG\n- A\n\n#Mac")
+        #expect(ShareList.picked(title: "T", groups: groups, signature: "", watermark: false, hashtags: "  ") == "T\n\nG\n- A")
+    }
+
     @Test func footerFollowsSignatureAndWatermark() {
         #expect(ShareList.footer(signature: "", watermark: false) == nil)
         #expect(ShareList.footer(signature: " Xuyi ", watermark: false) == "Xuyi")

@@ -25,22 +25,39 @@ enum CustomTemplate: String, Codable, CaseIterable, Identifiable {
 
 enum CanvasRatio: String, Codable, CaseIterable, Identifiable {
     case landscape = "横版", square = "方形", portrait = "竖版"
+    case xiaohongshu = "小红书", wide = "X / 横幅", story = "手机壁纸"
     var id: String { rawValue }
+
+    /// The three plain shapes, then the social-platform presets.
+    static let basic: [CanvasRatio] = [.landscape, .square, .portrait]
+    static let platforms: [CanvasRatio] = [.xiaohongshu, .wide, .story]
+
     /// Points; exported at 2x.
     var size: CGSize {
         switch self {
         case .landscape: CGSize(width: 800, height: 512)
         case .square: CGSize(width: 640, height: 640)
         case .portrait: CGSize(width: 640, height: 800)
+        case .xiaohongshu: CGSize(width: 600, height: 800)
+        case .wide: CGSize(width: 800, height: 450)
+        case .story: CGSize(width: 540, height: 960)
         }
     }
-    var label: String {
+    /// Wider than tall: the card lays groups out side by side.
+    var isWide: Bool { size.width > size.height }
+
+    var shape: String {
         switch self {
-        case .landscape: "25:16 · 1600×1024"
-        case .square: "1:1 · 1280×1280"
-        case .portrait: "4:5 · 1280×1600"
+        case .landscape: "25:16"
+        case .square: "1:1"
+        case .portrait: "4:5"
+        case .xiaohongshu: "3:4"
+        case .wide: "16:9"
+        case .story: "9:16"
         }
     }
+    var pixels: String { "\(Int(size.width * 2))×\(Int(size.height * 2))" }
+    var label: String { "\(shape) · \(pixels)" }
 }
 
 enum IconSize: String, Codable, CaseIterable, Identifiable {
@@ -89,6 +106,8 @@ struct CustomShareDoc: Codable, Equatable {
     var cornerRadius = 24.0
     /// Title override for the usage-ranking card; empty = automatic.
     var usageTitle = ""
+    /// Hashtags added as the last line of the copied app list; empty = none.
+    var hashtags = "#我的Mac软件 #Mac"
     /// Lay the card out as "icon + name + one-line note" and show `notes`.
     var showNotes = false
     /// One-line comments by app key (bundle id or custom-app key). Kept even if the app leaves every group.
@@ -118,6 +137,7 @@ struct CustomShareDoc: Codable, Equatable {
         mode = try c.decodeIfPresent(ShareMode.self, forKey: .mode) ?? d.mode
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
         usageTitle = try c.decodeIfPresent(String.self, forKey: .usageTitle) ?? d.usageTitle
+        hashtags = try c.decodeIfPresent(String.self, forKey: .hashtags) ?? d.hashtags
         showNotes = try c.decodeIfPresent(Bool.self, forKey: .showNotes) ?? d.showNotes
         notes = try c.decodeIfPresent([String: String].self, forKey: .notes) ?? d.notes
     }

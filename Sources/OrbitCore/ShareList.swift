@@ -25,8 +25,14 @@ public enum ShareList {
         sections.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
+    /// Joins the closing lines (signature, hashtags) with a single newline so they read as one block.
+    private static func closing(_ lines: [String?]) -> String? {
+        let kept = lines.compactMap { $0 }.filter { !$0.isEmpty }
+        return kept.isEmpty ? nil : kept.joined(separator: "\n")
+    }
+
     /// Picked apps: one block per group, "- Name — note" (just "- Name" when there is no note). Empty groups are skipped.
-    public static func picked(title: String, groups: [Group], signature: String, watermark: Bool) -> String {
+    public static func picked(title: String, groups: [Group], signature: String, watermark: Bool, hashtags: String = "") -> String {
         let blocks = groups.filter { !$0.items.isEmpty }.map { g -> String in
             let lines = g.items.map { item -> String in
                 let note = ShareNote.normalize(item.note)
@@ -34,7 +40,7 @@ public enum ShareList {
             }
             return ([g.name] + lines).joined(separator: "\n")
         }
-        return assemble([title.trimmingCharacters(in: .whitespacesAndNewlines)] + blocks + [footer(signature: signature, watermark: watermark)])
+        return assemble([title.trimmingCharacters(in: .whitespacesAndNewlines)] + blocks + [closing([footer(signature: signature, watermark: watermark), hashtags.trimmingCharacters(in: .whitespacesAndNewlines)])])
     }
 
     /// Usage ranking: "1. Chrome — 48.4 小时" in the order given. `showDuration` off leaves just the names.

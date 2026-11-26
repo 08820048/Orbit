@@ -220,9 +220,6 @@ struct ShareHubView: View {
             }
         }
         group("外观") {
-            if mode == .picked {
-                row("比例") { GlassSegmented(options: CanvasRatio.allCases, label: \.rawValue, selection: $custom.doc.ratio) }
-            }
             row("圆角") { Text("\(Int(custom.doc.cornerRadius)) pt").foregroundStyle(Theme.text2).monospacedDigit() }
             Slider(value: $custom.doc.cornerRadius, in: 0...56, step: 2)
             if mode == .picked {
@@ -259,6 +256,7 @@ struct ShareHubView: View {
         group("文案") {
             field("标题（留空自动生成）") { TextField("自动", text: $custom.doc.usageTitle, axis: .vertical).lineLimit(1...3) }
             field("署名") { TextField("署名", text: $custom.doc.signature) }
+            field("话题标签（可留空）") { TextField("#我的Mac软件 #Mac", text: $custom.doc.hashtags) }
         }
         group("数据范围") {
             GlassSegmented(options: AppModel.Period.allCases, label: \.rawValue, selection: $model.period, fill: true)
@@ -372,6 +370,30 @@ struct ShareHubView: View {
                 }
             }
             Text(custom.doc.template.blurb).font(.system(size: 11)).foregroundStyle(Theme.text2)
+        }
+        group("尺寸") {
+            ratioGrid(CanvasRatio.basic, detail: { $0.shape })
+            Text("社交平台").font(.system(size: 11)).foregroundStyle(Theme.text2)
+            ratioGrid(CanvasRatio.platforms, detail: { "\($0.shape) · \($0.pixels)" })
+            Text("当前：\(custom.doc.ratio.rawValue) · \(custom.doc.ratio.pixels)，导出为 2x PNG。软件太多放不下时，卡片会整体缩小。")
+                .font(.system(size: 11)).foregroundStyle(Theme.text2).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func ratioGrid(_ ratios: [CanvasRatio], detail: @escaping (CanvasRatio) -> String) -> some View {
+        HStack(spacing: 8) {
+            ForEach(ratios) { r in
+                let on = custom.doc.ratio == r
+                VStack(spacing: 2) {
+                    Text(r.rawValue).font(.system(size: 12))
+                    Text(detail(r)).font(.system(size: 10)).opacity(on ? 0.8 : 0.6).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(on ? Color.white : Theme.text)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(on ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.control), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .contentShape(Rectangle())
+                .onTapGesture { custom.doc.ratio = r }
+            }
         }
     }
 
@@ -523,7 +545,7 @@ struct ShareHubView: View {
             text = ShareList.picked(
                 title: d.title,
                 groups: groups.map { g in .init(name: g.name, items: g.apps.map { .init(name: $0.name, note: d.showNotes ? $0.note : "") }) },
-                signature: d.signature, watermark: d.watermark)
+                signature: d.signature, watermark: d.watermark, hashtags: d.hashtags)
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
