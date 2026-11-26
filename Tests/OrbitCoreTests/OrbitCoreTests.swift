@@ -314,3 +314,70 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(bare == "T\n\n1. Chrome")
     }
 }
+
+@Suite struct ScreenshotLibraryTests {
+    private func record(_ name: String, at t: TimeInterval, kind: CaptureKind = .region, source: String? = nil, bytes: Int64 = 100) -> ScreenshotRecord {
+        ScreenshotRecord(path: "/tmp/Orbit/\(name)", createdAt: Date(timeIntervalSince1970: t), kind: kind,
+                         pixelWidth: 1624, pixelHeight: 1072, scale: 2, byteCount: bytes, source: source)
+    }
+
+    @Test func namesStartWithTheProductAndNeverCollide() {
+        let utc = TimeZone(identifier: "UTC")!
+        let date = Date(timeIntervalSince1970: 1_795_000_000)   // fixed instant
+        let first = ScreenshotNaming.fileName(date: date, timeZone: utc, exists: { _ in false })
+        #expect(first.hasPrefix("Orbit 20") && first.hasSuffix(".png"))
+        #expect(first.contains(" ") && !first.contains(":") && !first.contains("/"))
+        let second = ScreenshotNaming.fileName(date: date, timeZone: utc, exists: { $0 == first })
+        #expect(second == first.replacingOccurrences(of: ".png", with: " (2).png"))
+        let third = ScreenshotNaming.fileName(date: date, timeZone: utc, exists: { $0 == first || $0 == second })
+        #expect(third.hasSuffix("(3).png"))
+        #expect(ScreenshotNaming.fileName(date: date, ext: "jpg", timeZone: utc, exists: { _ in false }).hasSuffix(".jpg"))
+    }
+
+    @Test func listsNewestFirstAndFiltersByKindAndSearch() throws {
+        let store = try ScreenshotStore(url: nil)
+        try store.add(record("Orbit A.png", at: 100, kind: .region, source: "Safari"))
+        try store.add(record("Orbit B.png", at: 300, kind: .window, source: "Xcode"))
+        try store.add(record("Orbit C.png", at: 200, kind: .fullscreen))
+        #expect(try store.records().map(\.fileName) == ["Orbit B.png", "Orbit C.png", "Orbit A.png"])
+        #expect(try store.records(kind: .window).map(\.fileName) == ["Orbit B.png"])
+        #expect(try store.records(search: "xcode").map(\.fileName) == ["Orbit B.png"])
+        #expect(try store.records(search: "orbit c").map(\.fileName) == ["Orbit C.png"])
+        #expect(try store.records(search: "100%").isEmpty)          // % is literal, not a wildcard
+        #expect(try store.records(limit: 2).count == 2)
+    }
+
+    @Test func totalsRemovalAndOlderThan() throws {
+        let store = try ScreenshotStore(url: nil)
+        let a = record("a.png", at: 100, bytes: 10), b = record("b.png", at: 200, bytes: 32)
+        try store.add(a); try store.add(b)
+        #expect(try store.count() == 2)
+        #expect(try store.totalBytes() == 42)
+        #expect(try store.records(olderThan: Date(timeIntervalSince1970: 150)).map(\.fileName) == ["a.png"])
+        try store.remove(id: a.id)
+        #expect(try store.record(id: a.id) == nil)
+        #expect(try store.count() == 1)
+        #expect(try store.removeAll() == [b.path])
+        #expect(try store.count() == 0)
+    }
+
+    @Test func reconcileDropsRecordsWhoseFileIsGone() throws {
+        let store = try ScreenshotStore(url: nil)
+        try store.add(record("kept.png", at: 1)); try store.add(record("gone.png", at: 2))
+        let dropped = try store.reconcile(fileExists: { $0.hasSuffix("kept.png") })
+        #expect(dropped == 1)
+        #expect(try store.records().map(\.fileName) == ["kept.png"])
+    }
+
+    @Test func pointSizeFollowsTheBackingScale() {
+        #expect(record("x.png", at: 0).pointSize == (812, 536))
+    }
+
+    @Test func recordsSurviveReopeningTheFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("orbit-shots-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let r = record("persist.png", at: 5, kind: .window, source: "Safari")
+        do { try ScreenshotStore(url: url).add(r) }
+        #expect(try ScreenshotStore(url: url).record(id: r.id) == r)
+    }
+}

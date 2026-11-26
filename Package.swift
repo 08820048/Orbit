@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Orbit",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "OrbitCore", targets: ["OrbitCore"]),
         .executable(name: "orbit-cli", targets: ["OrbitCLI"]),

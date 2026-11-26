@@ -26,7 +26,7 @@ Orbit 只做一件事：生成「我的 Mac 软件」分享图。
 
 ## 系统要求
 
-- macOS 13.0 及以上
+- macOS 14.0 及以上
 - 从源码构建需要 **完整的 Xcode**（Swift 6 工具链）。只装命令行工具（Command Line Tools）无法编译 SwiftUI 的宏，会报 `external macro implementation ... could not be found`。
 
 ## 从源码构建

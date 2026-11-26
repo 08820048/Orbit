@@ -62,7 +62,7 @@ cat > "$OUT/appcast.xml" <<XML
       <pubDate>$PUB_DATE</pubDate>
       <sparkle:version>$BUILD</sparkle:version>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/Orbit-$VERSION.zip" type="application/octet-stream" $SIGNATURE/>
     </item>
   </channel>
