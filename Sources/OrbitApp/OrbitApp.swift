@@ -71,24 +71,88 @@ final class WindowOpener {
 }
 
 /// The menu bar glyph: a planet with its orbit, drawn as a template image so it follows the menu bar colours.
+/// `satellite` (0...1) puts a small moon on the orbit for the occasional animation.
 enum MenuBarIcon {
-    static let image: NSImage = {
+    static let image = render(satellite: nil)
+
+    static func render(satellite: Double?) -> NSImage {
         let img = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
             NSColor.black.setStroke()
             NSColor.black.setFill()
+            // Everything is drawn in the tilted orbit frame: centre (10, 9), rotated 26 degrees.
+            let ctx = NSGraphicsContext.current!.cgContext
+            ctx.saveGState()
+            ctx.translateBy(x: 10, y: 9)
+            ctx.rotate(by: 26 * .pi / 180)
             let ring = NSBezierPath(ovalIn: NSRect(x: -8.6, y: -3.1, width: 17.2, height: 6.2))
             ring.lineWidth = 1.35
-            let place = NSAffineTransform()
-            place.translateX(by: 10, yBy: 9)
-            place.rotate(byDegrees: 26)
-            ring.transform(using: place as AffineTransform)
             ring.stroke()
+            ctx.restoreGState()
             NSBezierPath(ovalIn: NSRect(x: 5.6, y: 4.6, width: 8.8, height: 8.8)).fill()
+            if let t = satellite {
+                let theta = t * 2 * .pi
+                let (x, y) = (8.6 * cos(theta), 3.1 * sin(theta))
+                let rot = 26 * Double.pi / 180
+                let p = CGPoint(x: 10 + x * cos(rot) - y * sin(rot), y: 9 + x * sin(rot) + y * cos(rot))
+                // In front of the planet (lower half of the orbit): cut a small gap around the moon so it reads on top.
+                if sin(theta) < 0 {
+                    ctx.saveGState()
+                    ctx.setBlendMode(.clear)
+                    ctx.fillEllipse(in: CGRect(x: p.x - 3.2, y: p.y - 3.2, width: 6.4, height: 6.4))
+                    ctx.restoreGState()
+                }
+                NSBezierPath(ovalIn: NSRect(x: p.x - 1.9, y: p.y - 1.9, width: 3.8, height: 3.8)).fill()
+            }
             return true
         }
         img.isTemplate = true
         return img
-    }()
+    }
+}
+
+/// Drives the menu bar icon: every half minute or so a small moon makes one lap around the orbit. Skipped when the
+/// system asks for reduced motion.
+@MainActor
+final class MenuBarAnimator: ObservableObject {
+    @Published private(set) var icon = MenuBarIcon.image
+    private var idle: Timer?
+    private var frame: Timer?
+
+    static let lapDuration = 2.2
+    static let pause: ClosedRange<Double> = 25...45
+
+    init() {
+        // First lap shortly after launch so it is noticed, then at random-ish intervals.
+        schedule(after: 6)
+    }
+
+    private func schedule(after seconds: Double) {
+        idle?.invalidate()
+        idle = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.lap() }
+        }
+    }
+
+    private func lap() {
+        defer { schedule(after: Double.random(in: Self.pause)) }
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let start = Date()
+        frame?.invalidate()
+        frame = Timer.scheduledTimer(withTimeInterval: 1.0 / 24, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else { timer.invalidate(); return }
+                let p = Date().timeIntervalSince(start) / Self.lapDuration
+                if p >= 1 {
+                    timer.invalidate()
+                    self.icon = MenuBarIcon.image
+                } else {
+                    // ease in and out so the moon speeds up past the front of the planet
+                    let eased = p < 0.5 ? 2 * p * p : 1 - pow(-2 * p + 2, 2) / 2
+                    self.icon = MenuBarIcon.render(satellite: 0.75 + eased)   // start at the front, below the planet
+                }
+            }
+        }
+    }
 }
 
 @main
@@ -128,8 +192,9 @@ struct OrbitApp: App {
 
 private struct MenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
+    @StateObject private var animator = MenuBarAnimator()
     var body: some View {
-        Image(nsImage: MenuBarIcon.image)
+        Image(nsImage: animator.icon)
             .onAppear { WindowOpener.shared.open = { openWindow(id: "main") } }
     }
 }

@@ -26,9 +26,7 @@ lipo -archs build/Orbit.app/Contents/MacOS/Orbit
 
 echo "==> Creating the disk image"
 mkdir -p "$OUT"; rm -f "$DMG"
-/usr/bin/ditto build/Orbit.app "$STAGE/Orbit.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Orbit $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+scripts/make-dmg.sh build/Orbit.app "$DMG" "Orbit $VERSION"
 codesign --force --sign "$CODESIGN_IDENTITY" --timestamp "$DMG"
 
 echo "==> Notarizing (this waits for Apple)"
