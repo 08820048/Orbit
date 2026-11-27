@@ -48,6 +48,8 @@ private struct LinkText: View {
 
 /// The screenshot part of the settings page: shortcuts, what happens after a capture, storage, startup, permission.
 struct CaptureSettingsSections: View {
+    enum Part { case capture, shortcuts, general }
+    let part: Part
     @ObservedObject var settings: CaptureSettings
     @ObservedObject var capture: CaptureCoordinator
     @State private var confirmClear = false
@@ -56,11 +58,11 @@ struct CaptureSettingsSections: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 38) {
-            shortcuts
-            afterCapture
-            storage
-            startup
-            permission
+            switch part {
+            case .shortcuts: shortcuts
+            case .capture: afterCapture; storage
+            case .general: startup; permission
+            }
         }
         .confirmationDialog("清空截图库？", isPresented: $confirmClear) {
             Button("全部移到废纸篓", role: .destructive) { capture.deleteAll() }

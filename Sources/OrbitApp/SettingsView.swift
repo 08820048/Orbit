@@ -5,39 +5,14 @@ struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @State private var confirmErase = false
 
+    private enum Tab: String, CaseIterable { case capture = "截图", shortcuts = "快捷键", general = "通用", privacy = "数据与隐私" }
+    @State private var tab: Tab = .capture
+
     var body: some View {
         OScroll {
             VStack(alignment: .leading, spacing: 0) {
-                Text("设置").font(.system(size: 38, weight: .bold))
-
-                CaptureSettingsSections(settings: model.captureSettings, capture: model.capture)
-                    .padding(.top, 30)
-
-                group("数据与隐私") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        line("数据来源", String(localized: "屏幕使用时间（本机），加上 Orbit 自己的前台应用记录"))
-                        line("读取权限", accessText)
-                        line("本地记录", String(localized: "\(model.sessionCount) 条，最早 \(model.earliest?.formatted(date: .abbreviated, time: .omitted) ?? "—")"))
-                        line("上次导入", model.lastImport?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: "还没有"))
-                    }
-                    Text("除检查更新外，Orbit 不联网。所有数据只存在这台 Mac 的 ~/Library/Application Support/Orbit。")
-                        .font(.system(size: 12)).foregroundStyle(Theme.text2)
-                    if let err = model.lastError {
-                        Text(err).font(.system(size: 12)).foregroundStyle(.orange)
-                    }
-                    HStack(spacing: 10) {
-                        Button("刷新数据") { Task { await model.refresh() } }.glassButton()
-                        if model.access != .granted {
-                            Button("打开系统设置授权") { model.openFullDiskAccessSettings() }.glassButton(primary: true)
-                        }
-                        Button("清除所有记录…") { confirmErase = true }.glassButton()
-                    }
-                    .padding(.top, 4)
-                }
-                .padding(.top, 38)
-
-                group("更新") { UpdateSection(updater: model.updater) }
-                    .padding(.top, 38)
+                TextTabs(options: Tab.allCases, label: \.rawValue, selection: $tab)
+                content.padding(.top, 28)
             }
             .padding(.horizontal, 56).padding(.top, 22).padding(.bottom, 24)
             .frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading)
@@ -45,6 +20,43 @@ struct SettingsView: View {
         .confirmationDialog("清除 Orbit 里的所有使用记录？", isPresented: $confirmErase) {
             Button("清除", role: .destructive) { model.eraseAllData() }
         } message: { Text("不会影响系统的屏幕使用时间。此操作无法撤销。") }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch tab {
+        case .capture: CaptureSettingsSections(part: .capture, settings: model.captureSettings, capture: model.capture)
+        case .shortcuts: CaptureSettingsSections(part: .shortcuts, settings: model.captureSettings, capture: model.capture)
+        case .general:
+            VStack(alignment: .leading, spacing: 38) {
+                CaptureSettingsSections(part: .general, settings: model.captureSettings, capture: model.capture)
+                group("更新") { UpdateSection(updater: model.updater) }
+            }
+        case .privacy: privacy
+        }
+    }
+
+    private var privacy: some View {
+        group("数据与隐私") {
+            VStack(alignment: .leading, spacing: 12) {
+                line("数据来源", String(localized: "屏幕使用时间（本机），加上 Orbit 自己的前台应用记录"))
+                line("读取权限", accessText)
+                line("本地记录", String(localized: "\(model.sessionCount) 条，最早 \(model.earliest?.formatted(date: .abbreviated, time: .omitted) ?? "—")"))
+                line("上次导入", model.lastImport?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: "还没有"))
+            }
+            Text("除检查更新外，Orbit 不联网。所有数据只存在这台 Mac 的 ~/Library/Application Support/Orbit。")
+                .font(.system(size: 12)).foregroundStyle(Theme.text2)
+            if let err = model.lastError {
+                Text(err).font(.system(size: 12)).foregroundStyle(.orange)
+            }
+            HStack(spacing: 10) {
+                Button("刷新数据") { Task { await model.refresh() } }.glassButton()
+                if model.access != .granted {
+                    Button("打开系统设置授权") { model.openFullDiskAccessSettings() }.glassButton(primary: true)
+                }
+                Button("清除所有记录…") { confirmErase = true }.glassButton()
+            }
+            .padding(.top, 4)
+        }
     }
 
     private var accessText: String {
