@@ -451,11 +451,8 @@ enum RenderCheck {
 enum CaptureSelfTest {
     /// `--annotate-selftest <dir>`: draws every kind of annotation onto a made-up screenshot and saves the result, so the
     /// renderer (including the pixel-destroying blur) can be looked at without opening the editor.
-    static func annotateIfRequested() {
-        let args = CommandLine.arguments
-        guard let i = args.firstIndex(of: "--annotate-selftest"), i + 1 < args.count else { return }
-        let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    /// A made-up screenshot plus one of every annotation, for self-tests.
+    static func sampleEdit() -> (CGImage, [Annotation])? {
         let size = NSSize(width: 1680, height: 1040)
         let img = NSImage(size: size, flipped: true) { rect in
             NSColor(srgbRed: 0.12, green: 0.13, blue: 0.19, alpha: 1).setFill(); rect.fill()
@@ -472,7 +469,7 @@ enum CaptureSelfTest {
             }
             return true
         }
-        guard let base = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        guard let base = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         let w = Double(base.width)
         func style(_ a: Annotation, _ level: LineLevel = .medium) -> Annotation {
             var a = a; a.lineWidth = AnnotationScale.lineWidth(level, imageWidth: w); return a
@@ -498,6 +495,59 @@ enum CaptureSelfTest {
         plain.textSize = AnnotationRenderer.measureText("无底色文字 + 阴影", fontSize: plain.fontSize, background: false)
         items.append(plain)
 
+        return (base, items)
+    }
+
+    /// `--editor-selftest <dir>`: opens the real editor window off screen with sample annotations and saves what it looks like.
+    static func editorIfRequested(_ model: AppModel) {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--editor-selftest"), i + 1 < args.count, let (base, items) = sampleEdit() else { return }
+        let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let record = try? CaptureService.save(base, kind: .region, source: "Safari", scale: 2, format: .png, folder: dir, date: Date()),
+              let controller = EditorWindowController(record: record, capture: model.capture) else { return }
+        let window = controller.window!
+        window.setFrame(NSRect(x: 100, y: 100, width: 1180, height: 820), display: true)
+        window.orderFrontRegardless()
+        func snap(_ name: String) {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+            window.contentView?.layoutSubtreeIfNeeded()
+            guard let v = window.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
+            v.cacheDisplay(in: v.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name))
+        }
+        controller.model.commit(items: items)
+        controller.model.tool = .select
+        controller.model.select(items.first { if case .arrow = $0.shape { return true }; return false }?.id)
+        snap("editor-select.png")
+        controller.model.tool = .blur
+        snap("editor-blur-tool.png")
+        controller.model.tool = .crop
+        controller.model.setCropRatio(16.0 / 9.0)
+        snap("editor-crop.png")
+        controller.model.cropRect = CGRect(x: 560, y: 180, width: 960, height: 520)
+        controller.model.applyCrop()
+        controller.model.tool = .text
+        snap("editor-after-crop.png")
+        // Save as a new screenshot and check the result like a user would.
+        controller.saveAsNew()
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).filter { $0.hasSuffix(".png") && $0.hasPrefix("Orbit") }.sorted()
+        FileHandle.standardError.write(Data("SELFTEST files after saving: \(names)\n".utf8))
+        let indexed = ((try? model.capture.store.records()) ?? []).map(\.fileName)
+        FileHandle.standardError.write(Data("SELFTEST indexed: \(indexed)\n".utf8))
+        if let edited = ((try? model.capture.store.records()) ?? []).first(where: { $0.fileName.contains("已编辑") }) {
+            FileHandle.standardError.write(Data("SELFTEST edited image: \(edited.pixelWidth)x\(edited.pixelHeight), original untouched: \(FileManager.default.fileExists(atPath: record.path))\n".utf8))
+        }
+        FileHandle.standardError.write(Data("SELFTEST editor done\n".utf8))
+        exit(0)
+    }
+
+    static func annotateIfRequested() {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--annotate-selftest"), i + 1 < args.count else { return }
+        let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let (base, items) = sampleEdit() else { return }
         func save(_ cg: CGImage?, _ name: String) {
             guard let cg, let data = try? CaptureService.encode(cg, as: .png) else { return }
             try? data.write(to: dir.appendingPathComponent(name))
@@ -510,6 +560,7 @@ enum CaptureSelfTest {
 
     static func runIfRequested(_ model: AppModel) async {
         annotateIfRequested()
+        editorIfRequested(model)
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--capture-selftest"), i + 1 < args.count else { return }
         let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)

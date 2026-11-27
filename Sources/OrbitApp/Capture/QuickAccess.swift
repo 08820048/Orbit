@@ -10,6 +10,7 @@ final class QuickAccessController {
 
     struct Actions {
         var copy: () -> Void
+        var edit: () -> Void
         var reveal: () -> Void
         var delete: () -> Void
         var open: () -> Void
@@ -76,6 +77,7 @@ private struct QuickAccessView: View {
                     Color.black.opacity(0.5)
                     HStack(spacing: 10) {
                         roundButton("doc.on.doc", primary: true) { actions.copy(); dismiss() }.help("复制")
+                        roundButton("pencil.tip.crop.circle") { actions.edit(); dismiss() }.help("编辑")
                         roundButton("folder") { actions.reveal() }.help("在 Finder 中显示")
                         ShareLink(item: record.url) { icon("square.and.arrow.up", primary: false) }.buttonStyle(.plain).help("分享")
                         roundButton("trash") { actions.delete(); dismiss() }.help("删除")

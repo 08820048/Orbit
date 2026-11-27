@@ -7,6 +7,11 @@ import SwiftUI
 enum Thumbnails {
     private static let cache = NSCache<NSString, NSImage>()
 
+    private static func key(_ url: URL, _ maxPixel: Int) -> NSString {
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
+        return "\(url.path)@\(maxPixel)@\(modified)" as NSString
+    }
+
     private static func decode(_ url: URL, _ maxPixel: Int) -> NSImage? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
@@ -17,7 +22,7 @@ enum Thumbnails {
 
     /// Already decoded, or (only in the offscreen render check, which never runs `.task`) decoded right now.
     static func ready(for url: URL, maxPixel: Int) -> NSImage? {
-        let key = "\(url.path)@\(maxPixel)" as NSString
+        let key = key(url, maxPixel)
         if let hit = cache.object(forKey: key) { return hit }
         guard OScroll<EmptyView>.flat, let image = decode(url, maxPixel) else { return nil }
         cache.setObject(image, forKey: key)
@@ -25,7 +30,7 @@ enum Thumbnails {
     }
 
     static func image(for url: URL, maxPixel: Int) async -> NSImage? {
-        let key = "\(url.path)@\(maxPixel)" as NSString
+        let key = key(url, maxPixel)
         if let hit = cache.object(forKey: key) { return hit }
         let image: NSImage? = await Task.detached(priority: .utility) { decode(url, maxPixel) }.value
         if let image { cache.setObject(image, forKey: key) }
@@ -251,6 +256,7 @@ private struct ShotTile: View {
                     Color.black.opacity(0.5)
                     HStack(spacing: 8) {
                         tileButton("doc.on.doc", primary: true) { capture.copy(record) }
+                        tileButton("pencil.tip.crop.circle") { capture.edit(record) }
                         ShareLink(item: record.url) { tileIcon("square.and.arrow.up", primary: false) }.buttonStyle(.plain)
                         tileButton("trash") { capture.delete(record) }
                     }
@@ -263,6 +269,13 @@ private struct ShotTile: View {
             .onHover { hovering = $0 }
             .onTapGesture(perform: open)
             .onDrag { NSItemProvider(contentsOf: record.url) ?? NSItemProvider() }
+            .contextMenu {
+                Button("编辑") { capture.edit(record) }
+                Button("复制") { capture.copy(record) }
+                Button("在 Finder 中显示") { capture.reveal(record) }
+                Divider()
+                Button("移到废纸篓", role: .destructive) { capture.delete(record) }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(record.url.deletingPathExtension().lastPathComponent).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
@@ -314,7 +327,10 @@ private struct ScreenshotDetail: View {
                 }
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.panel)
-                    if let image { Image(nsImage: image).resizable().scaledToFit().padding(30).shadow(color: .black.opacity(0.4), radius: 16, y: 8) }
+                    if let image {
+                        Image(nsImage: image).resizable().scaledToFit().padding(30).shadow(color: .black.opacity(0.4), radius: 16, y: 8)
+                            .onTapGesture(count: 2) { capture.edit(record) }
+                    }
                     HStack {
                         arrow("chevron.left", enabled: (index ?? 0) > 0) { step(-1) }
                         Spacer()
@@ -334,6 +350,7 @@ private struct ScreenshotDetail: View {
         .onKeyPress(.rightArrow) { step(1); return .handled }
         .onKeyPress(.escape) { close(); return .handled }
         .onKeyPress(.delete) { trash(); return .handled }
+        .onKeyPress("e") { capture.edit(record); return .handled }
     }
 
     private var info: some View {
@@ -353,13 +370,14 @@ private struct ScreenshotDetail: View {
             VStack(alignment: .leading, spacing: 10) {
                 Button("复制") { capture.copy(record) }.glassButton(primary: true)
                 HStack(spacing: 10) {
+                    Button("编辑") { capture.edit(record) }.glassButton()
                     ShareLink(item: record.url) { Text("分享…") }.buttonStyle(GlassButtonStyle()).focusable(false)
                     Button("在 Finder 中显示") { capture.reveal(record) }.glassButton()
                 }
                 Button("移到废纸篓") { trash() }.glassButton()
             }
             .padding(.top, 28)
-            Text("键盘：← → 切换，⌫ 移到废纸篓，Esc 返回").font(.system(size: 11)).foregroundStyle(Theme.text2).padding(.top, 26)
+            Text("键盘：← → 切换，E 编辑，⌫ 移到废纸篓，Esc 返回").font(.system(size: 11)).foregroundStyle(Theme.text2).padding(.top, 26)
             Spacer()
         }
     }

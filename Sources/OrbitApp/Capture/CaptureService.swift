@@ -153,4 +153,33 @@ enum CaptureService {
         return ScreenshotRecord(path: url.path, createdAt: date, kind: kind, pixelWidth: image.width, pixelHeight: image.height,
                                 scale: scale, byteCount: Int64(data.count), source: source)
     }
+
+    // MARK: Saving an edited screenshot
+
+    private static func format(of record: ScreenshotRecord) -> ImageFormat {
+        record.url.pathExtension.lowercased() == "png" ? .png : .jpg
+    }
+
+    /// Saves the edited picture next to the original as "<name> 已编辑.png"; the original stays.
+    static func saveEdited(_ image: CGImage, from original: ScreenshotRecord, date: Date = Date()) throws -> ScreenshotRecord {
+        let fmt = format(of: original)
+        let data = try encode(image, as: fmt)
+        let fm = FileManager.default
+        let folder = original.url.deletingLastPathComponent()
+        let name = ScreenshotNaming.editedName(from: original.fileName, ext: fmt.fileExtension) { fm.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        let url = folder.appendingPathComponent(name)
+        do { try data.write(to: url, options: .atomic) } catch { throw CaptureError.saving(error.localizedDescription) }
+        return ScreenshotRecord(path: url.path, createdAt: date, kind: original.kind, pixelWidth: image.width, pixelHeight: image.height,
+                                scale: original.scale, byteCount: Int64(data.count), source: original.source)
+    }
+
+    /// Replaces the original: the old file goes to the Trash first, so it can be found again.
+    static func overwrite(_ image: CGImage, original: ScreenshotRecord) throws -> ScreenshotRecord {
+        let data = try encode(image, as: format(of: original))
+        try? FileManager.default.trashItem(at: original.url, resultingItemURL: nil)
+        do { try data.write(to: original.url, options: .atomic) } catch { throw CaptureError.saving(error.localizedDescription) }
+        return ScreenshotRecord(id: original.id, path: original.path, createdAt: original.createdAt, kind: original.kind,
+                                pixelWidth: image.width, pixelHeight: image.height, scale: original.scale,
+                                byteCount: Int64(data.count), source: original.source)
+    }
 }

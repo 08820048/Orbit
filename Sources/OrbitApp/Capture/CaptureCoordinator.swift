@@ -125,11 +125,30 @@ final class CaptureCoordinator: ObservableObject {
         if settings.autoCopy { copy(record, image: thumb) }
         if settings.playSound { Self.playShutter() }
         if settings.showQuickPanel {
-            quick.show(record: record, image: thumb, seconds: settings.quickPanelSeconds, actions: .init(
-                copy: { [weak self] in self?.copy(record) },
-                reveal: { [weak self] in self?.reveal(record) },
-                delete: { [weak self] in self?.delete(record) },
-                open: { NSWorkspace.shared.open(record.url) }))
+            showQuickPanel(for: record, image: thumb)
+        }
+    }
+
+    private func showQuickPanel(for record: ScreenshotRecord, image: NSImage) {
+        quick.show(record: record, image: image, seconds: settings.quickPanelSeconds, actions: .init(
+            copy: { [weak self] in self?.copy(record) },
+            edit: { [weak self] in self?.edit(record) },
+            reveal: { [weak self] in self?.reveal(record) },
+            delete: { [weak self] in self?.delete(record) },
+            open: { NSWorkspace.shared.open(record.url) }))
+    }
+
+    /// Opens the annotation editor for a screenshot.
+    func edit(_ record: ScreenshotRecord) { EditorManager.shared.open(record, capture: self) }
+
+    /// The editor saved a picture: index it (a new file or the replaced original) and show the result like a fresh capture.
+    func didSaveEdited(_ record: ScreenshotRecord, image: CGImage) {
+        try? store.add(record)
+        libraryVersion += 1
+        if settings.autoCopy { copy(record) }
+        if settings.showQuickPanel {
+            let scale = max(record.scale, 1)
+            showQuickPanel(for: record, image: NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)))
         }
     }
 
