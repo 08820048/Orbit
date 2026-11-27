@@ -220,9 +220,13 @@ private struct ShotTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                Rectangle().fill(Theme.control)
-                if let image { Image(nsImage: image).resizable().scaledToFill() }
+            // The picture sits in an overlay so a very wide or tall screenshot can never stretch the tile (and crowd its neighbours).
+            Rectangle().fill(Theme.control)
+                .frame(height: 116).frame(maxWidth: .infinity)
+                .overlay {
+                    if let image { Image(nsImage: image).resizable().scaledToFill() }
+                }
+                .overlay {
                 if hovering {
                     Color.black.opacity(0.5)
                     HStack(spacing: 8) {
@@ -233,7 +237,7 @@ private struct ShotTile: View {
                     }
                 }
             }
-            .frame(height: 116).frame(maxWidth: .infinity)
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)

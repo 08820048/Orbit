@@ -276,7 +276,8 @@ enum RenderCheck {
         var first: ScreenshotRecord?
         let now = Date()
         for i in 0..<9 {
-            let size = NSSize(width: 812, height: 536)
+            // A very wide and a very tall one, to check that no tile is stretched by its picture.
+            let size = i == 1 ? NSSize(width: 2400, height: 500) : i == 2 ? NSSize(width: 400, height: 1600) : NSSize(width: 812, height: 536)
             let (a, b) = palettes[i % palettes.count]
             let img = NSImage(size: size, flipped: false) { rect in
                 NSGradient(starting: a, ending: b)?.draw(in: rect, angle: 315)
