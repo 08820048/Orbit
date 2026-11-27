@@ -484,3 +484,77 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(ScreenshotNaming.editedName(from: "/a/b/Orbit x.jpg", exists: { _ in false }) == "Orbit x 已编辑.jpg")
     }
 }
+
+@Suite struct BeautifyTests {
+    @Test func backgroundStringsRoundTrip() {
+        for s in ["none", "solid:EEF1F6", "gradient:7F5AF0,2CB1F5", "builtin:fjord", "custom:abc.jpg"] {
+            #expect(BeautifyBackground(string: s).string == s)
+        }
+        #expect(BeautifyBackground(string: "garbage") == BeautifyBackground.defaultGradient)
+        #expect(BeautifyBackground(string: "solid:ZZZZZZ") == BeautifyBackground.defaultGradient)
+        #expect(AnnotationColor(hex: "#7f5af0")?.hex == "7F5AF0")
+        #expect(BeautifyBackground(string: "solid:FFFFFF").luminance > 0.9)
+        #expect(BeautifyBackground(string: "solid:000000").luminance < 0.1)
+    }
+
+    @Test func autoLayoutWrapsTheWindowInPadding() {
+        var s = BeautifyStyle()
+        s.frame = .none; s.padding = 20; s.ratio = .auto
+        let l = BeautifyLayout.compute(content: CGSize(width: 800, height: 500), style: s, pixelsPerPoint: 2)
+        #expect(l.canvas == CGSize(width: 880, height: 580))      // 800 + 2*40, 500 + 2*40
+        #expect(l.content == CGRect(x: 40, y: 40, width: 800, height: 500))
+        #expect(l.chrome == 0 && l.padding == 40)
+    }
+
+    @Test func titleBarAddsHeightAboveTheScreenshot() {
+        var s = BeautifyStyle()
+        s.frame = .window; s.padding = 10; s.ratio = .auto
+        let l = BeautifyLayout.compute(content: CGSize(width: 400, height: 300), style: s, pixelsPerPoint: 1)
+        #expect(l.chrome == 30)
+        #expect(l.window == CGRect(x: 10, y: 10, width: 400, height: 330))
+        #expect(l.content == CGRect(x: 10, y: 40, width: 400, height: 300))
+        #expect(l.canvas == CGSize(width: 420, height: 350))
+    }
+
+    @Test func fixedRatioCentresTheWindowAndGrowsOnlyOneSide() {
+        var s = BeautifyStyle()
+        s.frame = .none; s.padding = 20; s.ratio = .square
+        let l = BeautifyLayout.compute(content: CGSize(width: 600, height: 200), style: s, pixelsPerPoint: 1)
+        #expect(l.canvas == CGSize(width: 640, height: 640))
+        #expect(l.window.midX == 320 && l.window.midY == 320)
+        s.ratio = .wide
+        let tall = BeautifyLayout.compute(content: CGSize(width: 200, height: 600), style: s, pixelsPerPoint: 1)
+        #expect(abs(tall.canvas.width / tall.canvas.height - 16.0 / 9.0) < 0.01)
+        #expect(tall.canvas.height == 640)                         // content height 600 + padding, width grows
+        #expect(tall.window.midX == tall.canvas.width / 2)
+    }
+
+    @Test func presetsAreDistinctAndRecognised() {
+        let social = BeautifyPreset.social.style(), doc = BeautifyPreset.document.style(), clean = BeautifyPreset.clean.style()
+        #expect(social != doc && doc != clean && social.frame == .window && doc.frame == .none)
+        #expect(clean.backgroundValue == .none && !clean.showWatermark)
+        #expect(BeautifyPreset.matching(social) == .social)
+        var tweaked = social; tweaked.padding = 80
+        #expect(BeautifyPreset.matching(tweaked) == nil)
+        // title and signature text are the user's, so applying a preset keeps them
+        var mine = BeautifyStyle(); mine.title = "账户设置"; mine.signature = "徐毅"; mine.ratio = .wide
+        let applied = BeautifyPreset.document.style(keeping: mine)
+        #expect(applied.title == "账户设置" && applied.signature == "徐毅" && applied.ratio == .wide)
+        #expect(BeautifyPreset.matching(applied) == .document)
+    }
+
+    @Test func styleSurvivesEncodingAndOldFiles() throws {
+        var s = BeautifyStyle(); s.padding = 77; s.frame = .browser; s.ratio = .portrait45; s.title = "页面"
+        let back = try JSONDecoder().decode(BeautifyStyle.self, from: JSONEncoder().encode(s))
+        #expect(back == s)
+        let old = try JSONDecoder().decode(BeautifyStyle.self, from: Data(#"{"padding": 30}"#.utf8))   // fields added later fall back
+        #expect(old.padding == 30 && old.frame == .window && old.showWatermark)
+    }
+
+    @Test func beautifiedNamesReplaceTheEditedSuffix() {
+        let a = ScreenshotNaming.editedName(from: "Orbit 2026-11-26 21.03.12 已编辑.png", suffix: "已美化", exists: { _ in false })
+        #expect(a == "Orbit 2026-11-26 21.03.12 已美化.png")
+        let b = ScreenshotNaming.editedName(from: a, suffix: "已美化", exists: { $0 == a })
+        #expect(b == "Orbit 2026-11-26 21.03.12 已美化 (2).png")
+    }
+}
