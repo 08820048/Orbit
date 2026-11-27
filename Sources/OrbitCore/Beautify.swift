@@ -52,8 +52,8 @@ public enum BeautifyBackground: Equatable, Sendable {
 
     /// The gradient swatches offered in the inspector.
     public static let gradients: [(name: String, from: String, to: String)] = [
-        ("极光", "7F5AF0", "2CB1F5"), ("日落", "FF8A5B", "FF4D8D"), ("薄荷", "1FD1A5", "2E7CF6"), ("暖阳", "F9D423", "FF4E50"),
-        ("深海", "0F2027", "2C5364"), ("石墨", "232526", "414345"), ("云白", "FDFBFB", "EBEDEE"), ("糖果", "FBC2EB", "A6C1EE"),
+        (String(localized: "极光"), "7F5AF0", "2CB1F5"), (String(localized: "日落"), "FF8A5B", "FF4D8D"), (String(localized: "薄荷"), "1FD1A5", "2E7CF6"), (String(localized: "暖阳"), "F9D423", "FF4E50"),
+        (String(localized: "深海"), "0F2027", "2C5364"), (String(localized: "石墨"), "232526", "414345"), (String(localized: "云白"), "FDFBFB", "EBEDEE"), (String(localized: "糖果"), "FBC2EB", "A6C1EE"),
     ]
 
     /// Perceived brightness 0...1 of the background (images count as dark): decides signature and title colours.
@@ -70,7 +70,7 @@ public enum BeautifyBackground: Equatable, Sendable {
 
 public enum BeautifyFrame: String, Codable, CaseIterable, Sendable {
     case none, window, browser
-    public var label: String { self == .none ? "无" : self == .window ? "窗口" : "浏览器" }
+    public var label: String { self == .none ? String(localized: "无") : self == .window ? String(localized: "窗口") : String(localized: "浏览器") }
     /// Height of the title bar in points.
     public var chromePoints: Double { self == .none ? 0 : self == .window ? 30 : 38 }
 }

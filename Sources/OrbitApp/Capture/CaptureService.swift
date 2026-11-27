@@ -23,10 +23,10 @@ enum CaptureError: LocalizedError {
     case noPermission, noDisplay, encoding, saving(String)
     var errorDescription: String? {
         switch self {
-        case .noPermission: "Orbit 还没有屏幕录制权限"
-        case .noDisplay: "没有找到要截取的显示器"
-        case .encoding: "图片编码失败"
-        case let .saving(why): "无法保存截图：\(why)"
+        case .noPermission: String(localized: "Orbit 还没有屏幕录制权限")
+        case .noDisplay: String(localized: "没有找到要截取的显示器")
+        case .encoding: String(localized: "图片编码失败")
+        case let .saving(why): String(localized: "无法保存截图：\(why)")
         }
     }
 }
@@ -176,7 +176,7 @@ enum CaptureService {
     }
 
     /// Saves the edited picture next to the original as "<name> 已编辑.png" (or 已美化); the original stays.
-    static func saveEdited(_ image: CGImage, from original: ScreenshotRecord, suffix: String = "已编辑", date: Date = Date()) throws -> ScreenshotRecord {
+    static func saveEdited(_ image: CGImage, from original: ScreenshotRecord, suffix: String = String(localized: "已编辑"), date: Date = Date()) throws -> ScreenshotRecord {
         let fmt = format(of: original)
         let data = try encode(image, as: fmt)
         let fm = FileManager.default

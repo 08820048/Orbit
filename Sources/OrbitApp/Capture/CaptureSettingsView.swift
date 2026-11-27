@@ -6,7 +6,7 @@ import SwiftUI
 
 /// A titled block on the settings page.
 struct SettingsGroup<C: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder var content: C
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -19,11 +19,11 @@ struct SettingsGroup<C: View>: View {
 
 /// "label ........ control" row with a fixed label column.
 private struct SettingRow<C: View>: View {
-    let label: String
+    let label: LocalizedStringKey
     @ViewBuilder var content: C
     var body: some View {
         HStack(spacing: 14) {
-            Text(label).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 110, alignment: .leading)
+            Text(label).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 150, alignment: .leading)
             content
             Spacer(minLength: 0)
         }
@@ -32,15 +32,15 @@ private struct SettingRow<C: View>: View {
 }
 
 private struct Hint: View {
-    let text: String
-    init(_ text: String) { self.text = text }
+    let text: LocalizedStringKey
+    init(_ text: LocalizedStringKey) { self.text = text }
     var body: some View { Text(text).font(.system(size: 12)).foregroundStyle(Theme.text2) }
 }
 
 private struct LinkText: View {
-    let title: String
+    let title: LocalizedStringKey
     let action: () -> Void
-    init(_ title: String, _ action: @escaping () -> Void) { self.title = title; self.action = action }
+    init(_ title: LocalizedStringKey, _ action: @escaping () -> Void) { self.title = title; self.action = action }
     var body: some View {
         Button(action: action) { Text(title).font(.system(size: 12)).foregroundStyle(Theme.accentHi) }.buttonStyle(.plain)
     }
@@ -134,7 +134,7 @@ struct CaptureSettingsSections: View {
                     Text("\(capture.count) 张，\(ByteCountFormatter.string(fromByteCount: capture.totalBytes, countStyle: .file))").font(.system(size: 13))
                 }
                 SettingRow(label: "自动清理") {
-                    GlassSegmented(options: [0, 30, 90, 365], label: { $0 == 0 ? "从不" : $0 == 365 ? "1 年" : "\($0) 天" }, selection: $settings.autoCleanDays)
+                    GlassSegmented(options: [0, 30, 90, 365], label: { $0 == 0 ? String(localized: "从不") : $0 == 365 ? String(localized: "1 年") : String(localized: "\($0) 天") }, selection: $settings.autoCleanDays)
                 }
                 SettingRow(label: "清空截图库") {
                     Button("清空…") { confirmClear = true }.glassButton().disabled(capture.count == 0)
@@ -165,7 +165,7 @@ struct CaptureSettingsSections: View {
     private var permission: some View {
         SettingsGroup(title: "权限") {
             SettingRow(label: "屏幕录制") {
-                Text(granted ? "已授权" : "未授权").font(.system(size: 13))
+                Text(granted ? "已授权" : String(localized: "未授权")).font(.system(size: 13))
                 if !granted { Button("打开系统设置") { ScreenPermission.request(); ScreenPermission.openSettings() }.glassButton(primary: true) }
             }
         }
@@ -179,7 +179,7 @@ struct CaptureSettingsSections: View {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.directoryURL = settings.folderURL
-        panel.prompt = "选择"
+        panel.prompt = String(localized: "选择")
         if panel.runModal() == .OK, let url = panel.url { settings.folderPath = url.path }
     }
 
@@ -205,7 +205,7 @@ private struct ShortcutRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(action.title).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 110, alignment: .leading)
+            Text(action.title).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 150, alignment: .leading)
             if recording {
                 Text("按下新的快捷键…（Esc 取消）").font(.system(size: 12)).foregroundStyle(Theme.accentHi)
                     .padding(.horizontal, 10).frame(height: 26)
@@ -237,12 +237,12 @@ private struct ShortcutRow: View {
             let combo = KeyCombo(keyCode: UInt32(event.keyCode), modifiers: mods)
             // A global shortcut needs ⌃, ⌥ or ⌘, and a key we can name.
             guard mods & (KeyCombo.control | KeyCombo.option | KeyCombo.command) != 0, KeyCombo.keyName(combo.keyCode) != "?" else {
-                warning = "请至少带上 ⌃、⌥ 或 ⌘"
+                warning = String(localized: "请至少带上 ⌃、⌥ 或 ⌘")
                 NSSound.beep()
                 return nil
             }
             if let other = CaptureAction.allCases.first(where: { $0 != action && settings.combo($0) == combo }) {
-                warning = "已用于「\(other.title)」"
+                warning = String(localized: "已用于「\(other.title)」")
                 NSSound.beep()
                 return nil
             }

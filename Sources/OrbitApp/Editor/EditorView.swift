@@ -81,8 +81,8 @@ struct EditorView: View {
             }
             .padding(3).background(Theme.trough, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             HStack(spacing: 2) {
-                iconButton("arrow.uturn.backward", enabled: model.canUndo, help: "撤销（⌘Z）") { model.undo() }
-                iconButton("arrow.uturn.forward", enabled: model.canRedo, help: "重做（⇧⌘Z）") { model.redo() }
+                iconButton("arrow.uturn.backward", enabled: model.canUndo, help: String(localized: "撤销（⌘Z）")) { model.undo() }
+                iconButton("arrow.uturn.forward", enabled: model.canRedo, help: String(localized: "重做（⇧⌘Z）")) { model.redo() }
             }
             Spacer()
         }
@@ -185,7 +185,7 @@ struct EditorView: View {
                     GlassSegmented(options: BlurMode.allCases, label: \.label,
                                    selection: Binding(get: { model.blurMode }, set: { v in model.blurMode = v; model.restyleSelected { $0.blurMode = v } }))
                 }
-                labeled("强度") { levelPicker([1, 2, 3], selection: model.blurStrength, content: { Text(["弱", "中", "强"][$0 - 1]).font(.system(size: 12)) }) { v in
+                labeled("强度") { levelPicker([1, 2, 3], selection: model.blurStrength, content: { Text([String(localized: "弱"), String(localized: "中"), String(localized: "强")][$0 - 1]).font(.system(size: 12)) }) { v in
                     model.blurStrength = v
                     model.restyleSelected { $0.blurStrength = v }
                 } }
@@ -203,7 +203,7 @@ struct EditorView: View {
         .padding(.horizontal, 24).frame(height: 40)
     }
 
-    private func labeled<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func labeled<C: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         HStack(spacing: 10) {
             Text(title).font(.system(size: 12)).foregroundStyle(Theme.text2)
             content()
@@ -245,7 +245,7 @@ struct EditorView: View {
     }
 
     private var cropRatios: some View {
-        let options: [(String, Double?)] = [("自由", nil), ("1:1", 1), ("4:3", 4.0 / 3), ("16:9", 16.0 / 9), ("3:4", 3.0 / 4), ("9:16", 9.0 / 16)]
+        let options: [(String, Double?)] = [(String(localized: "自由"), nil), ("1:1", 1), ("4:3", 4.0 / 3), ("16:9", 16.0 / 9), ("3:4", 3.0 / 4), ("9:16", 9.0 / 16)]
         return HStack(spacing: 8) {
             ForEach(options, id: \.0) { name, ratio in
                 let on = model.cropRatio == ratio

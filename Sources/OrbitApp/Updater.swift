@@ -51,17 +51,17 @@ final class UpdateModel: NSObject, ObservableObject, SPUUpdaterDelegate {
     // MARK: SPUUpdaterDelegate
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
-        DispatchQueue.main.async { self.lastResult = "已是最新版本" }
+        DispatchQueue.main.async { self.lastResult = String(localized: "已是最新版本") }
     }
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         let name = item.displayVersionString
-        DispatchQueue.main.async { self.lastResult = "发现新版本 \(name)" }
+        DispatchQueue.main.async { self.lastResult = String(localized: "发现新版本 \(name)") }
     }
 
     func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: Error?) {
         // "No update available" also arrives here as an error; it is not a failure.
         guard let error = error as NSError?, error.code != Int(SUError.noUpdateError.rawValue) else { return }
-        DispatchQueue.main.async { self.lastResult = "检查失败" }
+        DispatchQueue.main.async { self.lastResult = String(localized: "检查失败") }
     }
 }

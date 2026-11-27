@@ -33,11 +33,11 @@ struct ShareHubView: View {
         }
         return ShareData(
             periodTitle: model.periodTitle,
-            coverage: "记录 \(s.daily.count) 天",
+            coverage: String(localized: "记录 \(s.daily.count) 天"),
             totalSeconds: s.totalSeconds, averageSeconds: s.averagePerActiveDay,
             longestDay: s.longestDay, appCount: s.appCount,
             share: s.totalSeconds > 0 ? (s.topApps.first?.seconds ?? 0) / s.totalSeconds : 0,
-            entries: Array(entries))
+            entries: Array(entries), periodKind: model.period)
     }
 
     /// The ranking card's style: its own layout choices plus the look shared with the picked-apps card.
@@ -87,7 +87,7 @@ struct ShareHubView: View {
         HStack(spacing: 16) {
             Button("存储为 PNG…") { save() }.glassButton().disabled(!canExport)
             Button("分享…") { shareWithSystem() }.glassButton().disabled(!canExport).background(ShareAnchorView(anchor: shareAnchor))
-            Button("复制清单") { copyList() }.glassButton().disabled(!canExport).help("把软件名复制成文字，和图一起发")
+            Button("复制清单") { copyList() }.glassButton().disabled(!canExport).help(String(localized: "把软件名复制成文字，和图一起发"))
             Button { copy() } label: {
                 HStack(spacing: 8) { Text("拷贝图片"); Text("⌘C").font(.system(size: 12)).opacity(0.7) }
             }
@@ -100,10 +100,12 @@ struct ShareHubView: View {
         if mode == .usage {
             guard !usageData.isEmpty else { return "" }
             let style = usageStyle
-            return "\(model.periodTitle) · \(style.template == .bubbles ? "\(style.bubbleCount) 个应用" : "Top \(style.topN)") · \(style.template.ratio)"
+            let shown = style.template == .bubbles ? String(localized: "\(style.bubbleCount) 个应用") : "Top \(style.topN)"
+            return "\(model.periodTitle) · \(shown) · \(style.template.ratio)"
         }
         guard custom.totalApps > 0 else { return "" }
-        return "\(custom.doc.title.isEmpty ? "未命名" : custom.doc.title) · \(custom.totalApps) 个软件 · \(custom.doc.ratio.label)"
+        let title = custom.doc.title.isEmpty ? String(localized: "未命名") : custom.doc.title
+        return String(localized: "\(title) · \(custom.totalApps) 个软件 · \(custom.doc.ratio.label)")
     }
 
     // MARK: Preview
@@ -197,7 +199,7 @@ struct ShareHubView: View {
     private var stylePage: some View {
         if mode == .usage { usageLayoutSection } else { pickedLayoutSection }
         group("背景") {
-            GlassSegmented(options: [0, 1, 2], label: { ["内置", "我的图片", "纯色"][$0] }, selection: $bgTab, fill: true)
+            GlassSegmented(options: [0, 1, 2], label: { [String(localized: "内置"), String(localized: "我的图片"), String(localized: "纯色")][$0] }, selection: $bgTab, fill: true)
             backgroundPicker
             if custom.doc.background.hasPrefix("builtin:") || custom.doc.background.hasPrefix("custom:")
                 || (mode == .picked && custom.doc.background == "default" && custom.doc.template == .fjord) {
@@ -254,9 +256,9 @@ struct ShareHubView: View {
     @ViewBuilder
     private var usageContentSections: some View {
         group("文案") {
-            field("标题（留空自动生成）") { TextField("自动", text: $custom.doc.usageTitle, axis: .vertical).lineLimit(1...3) }
-            field("署名") { TextField("署名", text: $custom.doc.signature) }
-            field("话题标签（可留空）") { TextField("#我的Mac软件 #Mac", text: $custom.doc.hashtags) }
+            field("标题（留空自动生成）") { TextField(String(localized: "自动"), text: $custom.doc.usageTitle, axis: .vertical).lineLimit(1...3) }
+            field("署名") { TextField(String(localized: "署名"), text: $custom.doc.signature) }
+            field("话题标签（可留空）") { TextField(String(localized: "#我的Mac软件 #Mac"), text: $custom.doc.hashtags) }
         }
         group("数据范围") {
             GlassSegmented(options: AppModel.Period.allCases, label: \.rawValue, selection: $model.period, fill: true)
@@ -275,7 +277,7 @@ struct ShareHubView: View {
                 ForEach(ShareTemplate.allCases) { t in
                     VStack(spacing: 6) {
                         usageTemplatePreview(t)
-                        Text(t.rawValue).font(.system(size: 11))
+                        Text(LocalizedStringKey(t.rawValue)).font(.system(size: 11))
                             .foregroundStyle(model.dataStyle.template == t ? Theme.text : Theme.text2)
                     }
                     .frame(maxWidth: .infinity)
@@ -338,9 +340,9 @@ struct ShareHubView: View {
             }
         }
         group("文案") {
-            field("标题") { TextField("标题", text: $custom.doc.title) }
-            field("文案（可留空，可换行）") { TextField("一句话", text: $custom.doc.caption, axis: .vertical).lineLimit(1...3) }
-            field("署名") { TextField("署名", text: $custom.doc.signature) }
+            field("标题") { TextField(String(localized: "标题"), text: $custom.doc.title) }
+            field("文案（可留空，可换行）") { TextField(String(localized: "一句话"), text: $custom.doc.caption, axis: .vertical).lineLimit(1...3) }
+            field("署名") { TextField(String(localized: "署名"), text: $custom.doc.signature) }
         }
         group("软件与分组") {
             if custom.doc.groups.isEmpty {
@@ -364,13 +366,13 @@ struct ShareHubView: View {
                     let added = custom.hasGroup(named: "Dock")
                     PresetChip(name: "Dock", added: added)
                         .onTapGesture { if !added { withAnimation { custom.addDockGroup(model.dockApps.compactMap(\.bundleID)) } } }
-                        .help(added ? "已添加" : "把 Dock 里的软件添加成一个分组")
+                        .help(added ? "已添加" : String(localized: "把 Dock 里的软件添加成一个分组"))
                 }
                 ForEach(GroupPreset.all) { preset in
                     let added = custom.hasGroup(named: preset.name)
                     PresetChip(name: preset.name, added: added)
                         .onTapGesture { if !added { withAnimation { custom.addPreset(preset, scores: model.recencyScores()) } } }
-                        .help(added ? "已添加" : "添加「\(preset.name)」并按类别推荐软件")
+                        .help(added ? "已添加" : String(localized: "添加「\(preset.name)」并按类别推荐软件"))
                 }
             }
             HStack(spacing: 8) {
@@ -389,7 +391,7 @@ struct ShareHubView: View {
                         templatePreview(t)
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .strokeBorder(custom.doc.template == t ? Theme.accent : .clear, lineWidth: 2))
-                        Text(t.rawValue).font(.system(size: 11))
+                        Text(LocalizedStringKey(t.rawValue)).font(.system(size: 11))
                             .foregroundStyle(custom.doc.template == t ? Theme.text : Theme.text2)
                     }
                     .frame(maxWidth: .infinity)
@@ -430,7 +432,7 @@ struct ShareHubView: View {
             ForEach(ratios) { r in
                 let on = custom.doc.ratio == r
                 VStack(spacing: 2) {
-                    Text(r.rawValue).font(.system(size: 12))
+                    Text(LocalizedStringKey(r.rawValue)).font(.system(size: 12))
                     Text(detail(r)).font(.system(size: 10)).opacity(on ? 0.8 : 0.6).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 .foregroundStyle(on ? Color.white : Theme.text)
@@ -447,7 +449,7 @@ struct ShareHubView: View {
             switch bgTab {
             case 0:
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                    bgThumb(id: "default", name: "版式默认") {
+                    bgThumb(id: "default", name: String(localized: "版式默认")) {
                         if mode == .usage { Rectangle().fill(usageThumb(model.dataStyle.template)) } else { Rectangle().fill(thumb(custom.doc.template)) }
                     }
                     ForEach(BuiltinBackground.all) { b in
@@ -521,7 +523,7 @@ struct ShareHubView: View {
         }
     }
 
-    private func group<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func group<C: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
             content()
@@ -529,11 +531,11 @@ struct ShareHubView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func row<C: View>(_ title: String, @ViewBuilder _ trailing: () -> C) -> some View {
+    private func row<C: View>(_ title: LocalizedStringKey, @ViewBuilder _ trailing: () -> C) -> some View {
         HStack { Text(title).font(.system(size: 13)); Spacer(); trailing().font(.system(size: 12)) }
     }
 
-    private func field<C: View>(_ label: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func field<C: View>(_ label: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label).font(.system(size: 11)).foregroundStyle(Theme.text2)
             content().textFieldStyle(.plain).font(.system(size: 13))
@@ -552,7 +554,7 @@ struct ShareHubView: View {
         do {
             custom.doc.background = "custom:" + (try BackgroundStore.importImage(from: url))
         } catch {
-            flash("无法导入图片：\(error.localizedDescription)")
+            flash(String(localized: "无法导入图片：\(error.localizedDescription)"))
         }
     }
 
@@ -563,17 +565,17 @@ struct ShareHubView: View {
 
     /// The macOS share menu (Messages, Mail, AirDrop…). The card goes out as a PNG file; nothing is uploaded by Orbit.
     private func shareWithSystem() {
-        guard let data = png(), let view = shareAnchor.view else { return flash("生成失败") }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Orbit 分享图.png")
-        do { try data.write(to: url) } catch { return flash("无法准备分享文件") }
+        guard let data = png(), let view = shareAnchor.view else { return flash(String(localized: "生成失败")) }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(String(localized: "Orbit 分享图.png"))
+        do { try data.write(to: url) } catch { return flash(String(localized: "无法准备分享文件")) }
         NSSharingServicePicker(items: [url]).show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
     }
 
     private func copy() {
-        guard let data = png() else { return flash("生成失败") }
+        guard let data = png() else { return flash(String(localized: "生成失败")) }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setData(data, forType: .png)
-        flash("已拷贝到剪贴板")
+        flash(String(localized: "已拷贝到剪贴板"))
     }
 
     /// The app names as text (Markdown-style list), for pasting next to the image.
@@ -595,17 +597,17 @@ struct ShareHubView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         let count = mode == .usage ? min(usageData.entries.count, usageStyle.template == .bubbles ? usageStyle.bubbleCount : usageStyle.topN) : custom.totalApps
-        flash("已复制软件清单 · \(count) 个软件")
+        flash(String(localized: "已复制软件清单 · \(count) 个软件"))
     }
 
     private func save() {
-        guard let data = png() else { return flash("生成失败") }
+        guard let data = png() else { return flash(String(localized: "生成失败")) }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = mode == .usage ? "Orbit \(model.periodTitle).png"
             : (custom.doc.title.isEmpty ? "Orbit" : custom.doc.title) + ".png"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { try data.write(to: url); flash("已保存") } catch { flash("保存失败：\(error.localizedDescription)") }
+        do { try data.write(to: url); flash(String(localized: "已保存")) } catch { flash(String(localized: "保存失败：\(error.localizedDescription)")) }
     }
 
     private func flash(_ text: String) {
@@ -675,7 +677,7 @@ struct AppPickerSheet: View {
                 }
                 .padding(.horizontal, 12).frame(height: 34)
                 .background(Theme.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                GlassSegmented(options: [0, 1, 2], label: { ["全部 \(custom.installed.count + custom.doc.customApps.count)", "最近常用", "已选"][$0] }, selection: $filter)
+                GlassSegmented(options: [0, 1, 2], label: { [String(localized: "全部 \(custom.installed.count + custom.doc.customApps.count)"), String(localized: "最近常用"), String(localized: "已选")][$0] }, selection: $filter)
                 Button("从其他位置添加…") { addFromElsewhere() }.glassButton()
                     .help("软件不在「应用程序」文件夹里（比如外置硬盘、下载目录）时，直接选择它")
             }
@@ -741,8 +743,8 @@ struct AppPickerSheet: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "添加"
-        panel.message = "选择想加进来的软件"
+        panel.prompt = String(localized: "添加")
+        panel.message = String(localized: "选择想加进来的软件")
         guard panel.runModal() == .OK else { return }
         custom.addExternalApps(panel.urls, to: custom.activeGroup)
     }
@@ -767,7 +769,7 @@ struct AppPickerSheet: View {
             SharpIcon(CustomAppIcons.render(CustomApp.from(tool)), 48).shadow(color: .black.opacity(0.35), radius: 8, y: 4)
             Text(tool.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
             Text(TerminalCatalog.command(for: tool)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.text2).lineLimit(1)
-            Text(owner ?? (detected ? "终端 · 已检测" : "终端 · 已添加")).font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)
+            Text(owner ?? (detected ? String(localized: "终端 · 已检测") : String(localized: "终端 · 已添加"))).font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)
         }
         .padding(.horizontal, 6).padding(.top, 13).padding(.bottom, 9).frame(maxWidth: .infinity)
         .opacity(other ? 0.55 : 1)
@@ -811,7 +813,7 @@ struct AppPickerSheet: View {
         return VStack(spacing: 6) {
             SharpIcon(resolved.icon, 48).shadow(color: .black.opacity(0.35), radius: 8, y: 4)
             Text(resolved.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-            Text(item.custom != nil ? "自定义" + (owner.map { " · \($0)" } ?? " · 可编辑") : (owner ?? " "))
+            Text(item.custom != nil ? String(localized: "自定义") + (owner.map { " · \($0)" } ?? String(localized: " · 可编辑")) : (owner ?? " "))
                 .font(.system(size: 10)).foregroundStyle(Theme.text2).lineLimit(1)
         }
         .padding(.horizontal, 6).padding(.top, 14).padding(.bottom, 10).frame(maxWidth: .infinity)
@@ -879,13 +881,13 @@ struct CustomAppSheet: View {
             HStack(spacing: 12) {
                 GlassIcon(index: GI.megaphone, size: 36)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isNew ? "添加自定义软件" : "编辑自定义软件").font(.system(size: 15, weight: .bold))
+                    Text(isNew ? "添加自定义软件" : String(localized: "编辑自定义软件")).font(.system(size: 15, weight: .bold))
                     Text("图片只保存在这台 Mac 上，不上传").font(.system(size: 11)).foregroundStyle(Theme.text2)
                 }
             }
             HStack(alignment: .top, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    label("图标")
+                    label(String(localized: "图标"))
                     ZStack {
                         RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.accent.opacity(targeted ? 0.18 : 0.07))
                         RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)
@@ -906,7 +908,7 @@ struct CustomAppSheet: View {
                 }
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
-                        label("名称")
+                        label(String(localized: "名称"))
                         TextField("例如 Claude Code、Gemini CLI", text: $draft.name).textFieldStyle(.plain).font(.system(size: 13))
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .background(Theme.control, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -929,11 +931,11 @@ struct CustomAppSheet: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 5) {
-                        label("图标样式")
-                        GlassSegmented(options: [true, false], label: { $0 ? "自动圆角方形" : "保持原样" }, selection: $draft.squircle, fill: true)
+                        label(String(localized: "图标样式"))
+                        GlassSegmented(options: [true, false], label: { $0 ? String(localized: "自动圆角方形") : String(localized: "保持原样") }, selection: $draft.squircle, fill: true)
                     }
                     VStack(alignment: .leading, spacing: 5) {
-                        label("底色（图片带透明背景，或没有图片时使用）")
+                        label(String(localized: "底色（图片带透明背景，或没有图片时使用）"))
                         HStack(spacing: 10) {
                             ForEach(Self.swatches, id: \.self) { hex in
                                 Circle().fill(Color(hexString: hex)).frame(width: 22, height: 22)
@@ -945,7 +947,7 @@ struct CustomAppSheet: View {
                     }
                     if isNew {
                         VStack(alignment: .leading, spacing: 5) {
-                            label("添加到分组")
+                            label(String(localized: "添加到分组"))
                             Picker("", selection: Binding(get: { groupID ?? UUID() }, set: { groupID = $0 })) {
                                 ForEach(custom.doc.groups) { Text($0.name).tag($0.id) }
                             }
@@ -961,7 +963,7 @@ struct CustomAppSheet: View {
             HStack {
                 Spacer()
                 Button("取消") { dismiss() }.glassButton().keyboardShortcut(.cancelAction)
-                Button(isNew ? "添加" : "保存") { commit() }.glassButton(primary: true)
+                Button(isNew ? "添加" : String(localized: "保存")) { commit() }.glassButton(primary: true)
                     .keyboardShortcut(.defaultAction).disabled(!canAdd)
             }
         }
@@ -1005,7 +1007,7 @@ struct CustomAppSheet: View {
     }
 
     private func set(_ image: NSImage?) {
-        guard let image, image.isValid else { error = "没有读到可用的图片，请换一张（PNG / JPG / HEIC / SVG）。"; return }
+        guard let image, image.isValid else { error = String(localized: "没有读到可用的图片，请换一张（PNG / JPG / HEIC / SVG）。"); return }
         error = nil
         pending = image
         draft.brand = nil   // the user's own picture wins over a catalog logo
@@ -1027,7 +1029,7 @@ struct CustomAppSheet: View {
                 app.iconFile = try CustomAppIcons.save(pending)
             }
         } catch {
-            self.error = "保存图片失败：\(error.localizedDescription)"
+            self.error = String(localized: "保存图片失败：\(error.localizedDescription)")
             return
         }
         if isNew { custom.addCustom(app, to: groupID) } else { custom.updateCustom(app) }

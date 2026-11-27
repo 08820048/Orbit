@@ -42,7 +42,7 @@ public enum AnnotationShape: Equatable, Sendable {
 
 public enum BlurMode: String, Equatable, Sendable, CaseIterable {
     case blur, pixelate
-    public var label: String { self == .blur ? "模糊" : "马赛克" }
+    public var label: String { self == .blur ? String(localized: "模糊") : String(localized: "马赛克") }
 }
 
 public enum LineLevel: Int, CaseIterable, Sendable { case thin = 1, medium, thick }

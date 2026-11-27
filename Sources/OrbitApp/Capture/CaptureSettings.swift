@@ -73,11 +73,11 @@ enum CaptureAction: String, CaseIterable, Codable, Identifiable {
 
     var title: String {
         switch self {
-        case .region: "区域截图"
-        case .window: "窗口截图"
-        case .fullscreen: "全屏截图"
-        case .delayed: "延时截图"
-        case .repeatLast: "重复上一次区域"
+        case .region: String(localized: "区域截图")
+        case .window: String(localized: "窗口截图")
+        case .fullscreen: String(localized: "全屏截图")
+        case .delayed: String(localized: "延时截图")
+        case .repeatLast: String(localized: "重复上一次区域")
         }
     }
 

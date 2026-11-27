@@ -100,10 +100,12 @@ struct ShareData {
     var appCount: Int
     var share: Double             // top app's share of total, 0...1
     var entries: [ShareEntry]
+    /// Which period the numbers cover; decides how the card title is worded.
+    var periodKind: AppModel.Period = .year
 
     var isEmpty: Bool { entries.isEmpty }
 
-    static let placeholder = ShareData(periodTitle: "2026", coverage: "记录 0 天", totalSeconds: 0, averageSeconds: 0,
+    static let placeholder = ShareData(periodTitle: "2026", coverage: String(localized: "记录 0 天"), totalSeconds: 0, averageSeconds: 0,
                                        longestDay: nil, appCount: 0, share: 0, entries: [])
 }
 
@@ -212,10 +214,10 @@ struct ShareCardView: View {
 
     var rankedTitle: String {
         if !style.title.isEmpty { return style.title }
-        switch data.periodTitle {
-        case let t where t.hasPrefix("最近"): return "\(t)\n我最常用的 Mac 应用"
-        case let t where t.hasSuffix("月"): return "\(t)我最常用的\nMac 应用"
-        default: return "\(data.periodTitle) 我最常用的\nMac 应用"
+        switch data.periodKind {
+        case .week: return String(localized: "\(data.periodTitle)\n我最常用的 Mac 应用")
+        case .month: return String(localized: "\(data.periodTitle)我最常用的\nMac 应用")
+        case .year: return String(localized: "\(data.periodTitle) 我最常用的\nMac 应用")
         }
     }
 
@@ -269,7 +271,7 @@ struct ShareCardView: View {
         let top = data.entries.first
         let others = Array(data.entries.dropFirst().prefix(3).enumerated())
         return VStack(spacing: 0) {
-            kicker("ORBIT / \(data.periodTitle.uppercased()) · 陪伴").padding(.top, 44)
+            kicker(String(localized: "ORBIT / \(data.periodTitle.uppercased()) · 陪伴")).padding(.top, 44)
             if let top {
                 SharpIcon(top.icon, 132)
                     .shadow(color: style.accentValue.lo.opacity(0.7), radius: 36)
@@ -318,18 +320,18 @@ struct ShareCardView: View {
             Text(data.periodTitle).font(.system(size: data.periodTitle.count > 4 ? 64 : 100, weight: .bold)).tracking(-2)
                 .foregroundStyle(LinearGradient(colors: [ink, hi], startPoint: .top, endPoint: .bottom))
                 .lineLimit(1).minimumScaleFactor(0.5).padding(.top, 14)
-            Text(style.title.isEmpty ? "我在 Mac 上的这段时光" : style.title).font(.system(size: 26, weight: .bold)).foregroundStyle(ink).padding(.top, 6)
+            Text(style.title.isEmpty ? String(localized: "我在 Mac 上的这段时光") : style.title).font(.system(size: 26, weight: .bold)).foregroundStyle(ink).padding(.top, 6)
             Text("\(data.coverage)，我把 \(Fmt.long(data.totalSeconds)) 交给了屏幕。")
                 .font(.system(size: 13, weight: .light)).foregroundStyle(muted).lineSpacing(5).padding(.top, 12)
 
             Rectangle().fill(hairline).frame(height: 1).padding(.top, 30)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 22) {
-                stat(GI.timer, "总使用时长", Fmt.duration(data.totalSeconds))
-                stat(GI.swap, "日均", Fmt.duration(data.averageSeconds))
+                stat(GI.timer, String(localized: "总使用时长"), Fmt.duration(data.totalSeconds))
+                stat(GI.swap, String(localized: "日均"), Fmt.duration(data.averageSeconds))
                 if let longest {
-                    stat(GI.calendar, "最长的一天 · \(longest.day.formatted(.dateTime.month().day()))", Fmt.duration(longest.seconds))
+                    stat(GI.calendar, String(localized: "最长的一天 · \(longest.day.formatted(.dateTime.month().day()))"), Fmt.duration(longest.seconds))
                 }
-                stat(GI.layout, "常用应用", (String(data.appCount), "个"))
+                stat(GI.layout, String(localized: "常用应用"), (String(data.appCount), String(localized: "个")))
             }
             .padding(.vertical, 24)
             Rectangle().fill(hairline).frame(height: 1)
@@ -387,7 +389,7 @@ struct ShareCardView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(rankedTitle.replacingOccurrences(of: "\n", with: " ")).font(.system(size: 12, weight: .semibold))
-                Text("\(data.coverage) · 共 \(Fmt.long(data.totalSeconds))" + (style.signature.isEmpty ? "" : " · \(style.signature)"))
+                Text(String(localized: "\(data.coverage) · 共 \(Fmt.long(data.totalSeconds))") + (style.signature.isEmpty ? "" : " · \(style.signature)"))
                     .font(.system(size: 10)).opacity(0.7)
             }
             .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 8)

@@ -4,7 +4,7 @@ import Foundation
 public enum ShareNote {
     public static let maxLength = 16
     /// Quick fills offered while typing.
-    public static let suggestions = ["主力", "常驻", "新欢", "付费也值"]
+    public static let suggestions = [String(localized: "主力"), String(localized: "常驻"), String(localized: "新欢"), String(localized: "付费也值")]
 
     /// While typing: one line only, at most `maxLength` characters. Spaces are kept so "Mac 瘦身" can be typed.
     public static func limit(_ text: String) -> String {

@@ -55,7 +55,7 @@ public enum ShareList {
 
     /// "48.4 小时"; under an hour it is whole minutes ("35 分钟").
     static func duration(_ seconds: TimeInterval) -> String {
-        if seconds >= 3600 { return String(format: "%.1f 小时", seconds / 3600) }
-        return "\(max(1, Int((seconds / 60).rounded()))) 分钟"
+        if seconds >= 3600 { return String(format: String(localized: "%.1f 小时"), seconds / 3600) }
+        return String(localized: "\(max(1, Int((seconds / 60).rounded()))) 分钟")
     }
 }

@@ -16,30 +16,30 @@ struct GroupPreset: Identifiable {
     }
 
     func categoryMatch(_ app: InstalledApp) -> Bool {
-        categories.contains(app.category) || (name == "游戏娱乐" && Self.isGameCategory(app.category))
+        categories.contains(app.category) || (name == String(localized: "游戏娱乐") && Self.isGameCategory(app.category))
     }
 
     static let all: [GroupPreset] = [
-        .init(name: "AI 与开发", categories: [],
+        .init(name: String(localized: "AI 与开发"), categories: [],
               keywords: ["claude", "chatgpt", "openai", "codex", "anthropic", "cursor", "copilot", "gemini", "deepseek", "ollama",
                          "lmstudio", "lm studio", "windsurf", "perplexity", "kimi", "doubao", "豆包", "通义", "alma", "antigravity", "trae"]),
-        .init(name: "开发工具", categories: ["developer-tools"],
+        .init(name: String(localized: "开发工具"), categories: ["developer-tools"],
               keywords: ["xcode", "vscode", "visual studio", "jetbrains", "zed", "iterm", "terminal", "warp", "docker", "postman", "sublime", "termius", "github", "unity"]),
-        .init(name: "写作与学习", categories: ["education", "reference"],
+        .init(name: String(localized: "写作与学习"), categories: ["education", "reference"],
               keywords: ["typora", "obsidian", "notion", "bear", "ulysses", "thymer", "logseq", "ibooks", "books", "anki", "notes", "备忘录", "pages", "marginnote"]),
-        .init(name: "办公", categories: ["business", "productivity", "finance"],
+        .init(name: String(localized: "办公"), categories: ["business", "productivity", "finance"],
               keywords: ["microsoft.word", "microsoft.excel", "microsoft.powerpoint", "microsoft.outlook", "iwork", "numbers", "keynote", "wps", "office", "calendar", "日历"]),
-        .init(name: "影像与设计", categories: ["graphics-design", "photography"],
+        .init(name: String(localized: "影像与设计"), categories: ["graphics-design", "photography"],
               keywords: ["figma", "sketch", "pixelmator", "photoshop", "illustrator", "affinity", "blender", "preview", "snipaste", "eagle", "pixel"]),
-        .init(name: "音乐与视频", categories: ["music", "video"],
+        .init(name: String(localized: "音乐与视频"), categories: ["music", "video"],
               keywords: ["music", "quicktime", "iina", "vlc", "spotify", "netease", "音乐", "tv", "podcast", "infuse"]),
-        .init(name: "效率与系统", categories: ["utilities"],
+        .init(name: String(localized: "效率与系统"), categories: ["utilities"],
               keywords: ["finder", "raycast", "alfred", "bartender", "cleanmymac", "mole", "clash", "activity monitor", "keychain", "1password", "hush", "owlsort", "runnock"]),
-        .init(name: "社交与通讯", categories: ["social-networking"],
+        .init(name: String(localized: "社交与通讯"), categories: ["social-networking"],
               keywords: ["wechat", "xinwechat", "tencent.qq", "telegram", "whatsapp", "slack", "discord", "feishu", "lark", "dingtalk", "messages", "mail", "line", "zoom", "teams"]),
-        .init(name: "上网与媒体", categories: ["news"],
+        .init(name: String(localized: "上网与媒体"), categories: ["news"],
               keywords: ["chrome", "safari", "firefox", "microsoft.edgemac", "arc", "brave", "opera", "browser", "reeder", "newsblur"]),
-        .init(name: "游戏娱乐", categories: ["entertainment"],
+        .init(name: String(localized: "游戏娱乐"), categories: ["entertainment"],
               keywords: ["steam", "epic", "game", "minecraft", "battle.net"]),
     ]
 

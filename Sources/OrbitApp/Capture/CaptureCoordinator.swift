@@ -90,12 +90,12 @@ final class CaptureCoordinator: ObservableObject {
                 let pick = screens.first { $0.screen.frame.contains(mouse) } ?? screens[0]
                 try finish(pick.image, kind: .fullscreen, source: source, scale: Double(pick.scale))
             case .repeatLast:
-                guard let area = lastRegion else { notice("还没有可以重复的区域", "先用「区域截图」截一次，之后就能用这个快捷键重复同一块区域。"); return }
+                guard let area = lastRegion else { notice(String(localized: "还没有可以重复的区域"), String(localized: "先用「区域截图」截一次，之后就能用这个快捷键重复同一块区域。")); return }
                 let screens = try await CaptureService.freezeScreens(includeCursor: settings.includeCursor)
                 let center = CGPoint(x: area.rect.midX, y: area.rect.midY)
                 guard let f = screens.first(where: { $0.screen.frame == area.screenFrame }) ?? screens.first(where: { $0.screen.frame.contains(center) }),
                       let image = f.crop(area.rect.offsetBy(dx: -f.screen.frame.minX, dy: -f.screen.frame.minY)) else {
-                    notice("找不到上次的区域", "那块区域所在的显示器现在不可用。"); return
+                    notice(String(localized: "找不到上次的区域"), String(localized: "那块区域所在的显示器现在不可用。")); return
                 }
                 try finish(image, kind: .region, source: source, scale: Double(f.scale))
             case .region, .delayed, .window:

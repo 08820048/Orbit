@@ -53,3 +53,15 @@ ORBIT_LIGHT=1 ORBIT_FLAT=1 "$BIN" --render-check /tmp/orbit-light  # 浅色
 ## 报告问题
 
 请使用 Issue 模板，并写明 macOS 版本。涉及屏幕使用时间读不到的问题，请说明是否已授予完全磁盘访问。
+
+## Localization
+
+The UI is Simplified Chinese (source language) and English; it follows the system language. Chinese text in code is the key:
+SwiftUI `Text("…")` and `String(localized: "…")` look it up in `Packaging/Localization/en.lproj/Localizable.strings`,
+which `scripts/build-app.sh` copies into the app. Enum raw values that are shown in the UI are looked up through
+`LocalizedStringKey(rawValue)`, so they need an entry too (the compiler can't see them).
+
+- Add the English line for every new Chinese string. Use positional specifiers (`%1$@`) when word order differs.
+- `scripts/i18n-scan.py` lists Chinese literals the compiler did not extract; `scripts/i18n-check.py <dir>` compares
+  extracted keys with the `.strings` file (see the scripts for usage).
+- Check the result with `build/Orbit.app/Contents/MacOS/Orbit -AppleLanguages "(en)" --render-check <dir>`.

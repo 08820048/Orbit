@@ -15,10 +15,10 @@ struct SettingsView: View {
 
                 group("数据与隐私") {
                     VStack(alignment: .leading, spacing: 12) {
-                        line("数据来源", "屏幕使用时间（本机），加上 Orbit 自己的前台应用记录")
+                        line("数据来源", String(localized: "屏幕使用时间（本机），加上 Orbit 自己的前台应用记录"))
                         line("读取权限", accessText)
-                        line("本地记录", "\(model.sessionCount) 条，最早 \(model.earliest?.formatted(date: .abbreviated, time: .omitted) ?? "—")")
-                        line("上次导入", model.lastImport?.formatted(date: .abbreviated, time: .shortened) ?? "还没有")
+                        line("本地记录", String(localized: "\(model.sessionCount) 条，最早 \(model.earliest?.formatted(date: .abbreviated, time: .omitted) ?? "—")"))
+                        line("上次导入", model.lastImport?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: "还没有"))
                     }
                     Text("除检查更新外，Orbit 不联网。所有数据只存在这台 Mac 的 ~/Library/Application Support/Orbit。")
                         .font(.system(size: 12)).foregroundStyle(Theme.text2)
@@ -49,13 +49,13 @@ struct SettingsView: View {
 
     private var accessText: String {
         switch model.access {
-        case .granted: "已授权"
-        case .denied: "未授权（完全磁盘访问权限）"
-        case .unavailable: "没有找到屏幕使用时间数据库"
+        case .granted: String(localized: "已授权")
+        case .denied: String(localized: "未授权（完全磁盘访问权限）")
+        case .unavailable: String(localized: "没有找到屏幕使用时间数据库")
         }
     }
 
-    private func group<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func group<C: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title).font(.system(size: 15, weight: .semibold))
             content()
@@ -63,7 +63,7 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func line(_ k: String, _ v: String) -> some View {
+    private func line(_ k: LocalizedStringKey, _ v: String) -> some View {
         HStack(alignment: .top) {
             Text(k).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 80, alignment: .leading)
             Text(v).font(.system(size: 13))
@@ -93,12 +93,12 @@ private struct UpdateSection: View {
     }
 
     private var statusText: String {
-        guard let last = updater.lastCheck else { return "还没有检查过" }
+        guard let last = updater.lastCheck else { return String(localized: "还没有检查过") }
         let when = last.formatted(date: .abbreviated, time: .shortened)
-        return updater.lastResult.map { "上次检查：\(when)，\($0)" } ?? "上次检查：\(when)"
+        return updater.lastResult.map { String(localized: "上次检查：\(when)，\($0)") } ?? String(localized: "上次检查：\(when)")
     }
 
-    private func row<C: View>(_ k: String, @ViewBuilder _ v: () -> C) -> some View {
+    private func row<C: View>(_ k: LocalizedStringKey, @ViewBuilder _ v: () -> C) -> some View {
         HStack(alignment: .center) {
             Text(k).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 80, alignment: .leading)
             v()

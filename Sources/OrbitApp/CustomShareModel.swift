@@ -15,10 +15,10 @@ enum CustomTemplate: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var blurb: String {
         switch self {
-        case .fjord: "照片背景 + 宋体标题，左侧分组名"
-        case .glass: "蓝色玻璃卡片，每个分组一块毛玻璃"
-        case .paper: "浅色纸张底，适合白天分享"
-        case .minimal: "纯黑底，不分组，只有图标阵列"
+        case .fjord: String(localized: "照片背景 + 宋体标题，左侧分组名")
+        case .glass: String(localized: "蓝色玻璃卡片，每个分组一块毛玻璃")
+        case .paper: String(localized: "浅色纸张底，适合白天分享")
+        case .minimal: String(localized: "纯黑底，不分组，只有图标阵列")
         }
     }
 }
@@ -85,7 +85,7 @@ struct ShareGroup: Codable, Identifiable, Equatable {
 }
 
 struct CustomShareDoc: Codable, Equatable {
-    var title = "2026 我的 Mac 常用软件"
+    var title = String(localized: "\(Calendar.current.component(.year, from: Date())) 我的 Mac 常用软件")
     var caption = ""
     var signature = NSFullUserName()
     var groups: [ShareGroup] = []
@@ -107,7 +107,7 @@ struct CustomShareDoc: Codable, Equatable {
     /// Title override for the usage-ranking card; empty = automatic.
     var usageTitle = ""
     /// Hashtags added as the last line of the copied app list; empty = none.
-    var hashtags = "#我的Mac软件 #Mac"
+    var hashtags = String(localized: "#我的Mac软件 #Mac")
     /// Lay the card out as "icon + name + one-line note" and show `notes`.
     var showNotes = false
     /// Apps the user added from outside the usual folders, by path (they would not be found by scanning).
@@ -209,10 +209,10 @@ struct BuiltinBackground: Identifiable {
     let id: String
     let name: String
     static let all: [BuiltinBackground] = [
-        .init(id: "fjord", name: "峡湾暮色"), .init(id: "mist-lake", name: "云雾湖山"),
-        .init(id: "dark-lake", name: "暗色湖面"), .init(id: "milkyway", name: "银河山脊"),
-        .init(id: "alps-night", name: "雪山星夜"), .init(id: "horizon", name: "海平线"),
-        .init(id: "sunset-sea", name: "红霞海面"), .init(id: "fluid-blue", name: "蓝绿流体"),
+        .init(id: "fjord", name: String(localized: "峡湾暮色")), .init(id: "mist-lake", name: String(localized: "云雾湖山")),
+        .init(id: "dark-lake", name: String(localized: "暗色湖面")), .init(id: "milkyway", name: String(localized: "银河山脊")),
+        .init(id: "alps-night", name: String(localized: "雪山星夜")), .init(id: "horizon", name: String(localized: "海平线")),
+        .init(id: "sunset-sea", name: String(localized: "红霞海面")), .init(id: "fluid-blue", name: String(localized: "蓝绿流体")),
     ]
 }
 
@@ -311,7 +311,7 @@ final class CustomShareModel: ObservableObject {
         guard doc.groups.isEmpty, !installed.isEmpty else { return }
         let top = AppRecommender.pick(from: installed.filter(AppRecommender.isRecommendable), scores: scores, limit: 12, minimum: 0)
         guard !top.isEmpty else { return }
-        let group = ShareGroup(name: "常用软件", bundleIDs: top.map(\.bundleID))
+        let group = ShareGroup(name: String(localized: "常用软件"), bundleIDs: top.map(\.bundleID))
         doc.groups = [group]
         activeGroup = group.id
     }
@@ -338,7 +338,7 @@ final class CustomShareModel: ObservableObject {
     }
 
     func addGroup() {
-        let group = ShareGroup(name: "分组 \(doc.groups.count + 1)")
+        let group = ShareGroup(name: String(localized: "分组 \(doc.groups.count + 1)"))
         doc.groups.append(group)
         activeGroup = group.id
     }
@@ -452,7 +452,7 @@ final class CustomShareModel: ObservableObject {
         let group = ShareGroup(name: "Dock", bundleIDs: ids)
         doc.groups.append(group)
         activeGroup = group.id
-        presetNote = ids.isEmpty ? "Dock 里的软件都已经在其他分组里了。" : nil
+        presetNote = ids.isEmpty ? String(localized: "Dock 里的软件都已经在其他分组里了。") : nil
     }
 
     /// Adds a built-in group and fills it with installed apps that fit it, best recent usage first (at most 6).
@@ -466,8 +466,8 @@ final class CustomShareModel: ObservableObject {
         doc.groups.append(group)
         activeGroup = group.id
         presetNote = picks.isEmpty
-            ? "没有找到适合「\(preset.name)」的已安装软件，请点「从已安装软件中选择」手动添加。"
-            : "已按软件类别为「\(preset.name)」推荐了 \(picks.count) 个，可在「选择软件」里增减。"
+            ? String(localized: "没有找到适合「\(preset.name)」的已安装软件，请点「从已安装软件中选择」手动添加。")
+            : String(localized: "已按软件类别为「\(preset.name)」推荐了 \(picks.count) 个，可在「选择软件」里增减。")
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             self?.presetNote = nil

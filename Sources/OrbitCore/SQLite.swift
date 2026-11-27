@@ -10,9 +10,9 @@ final class SQLiteDatabase {
 
         var description: String {
             switch self {
-            case let .open(path, code, message): "无法打开数据库 \(path)（\(code)）：\(message)"
-            case let .prepare(sql, message): "SQL 预编译失败：\(message)\n\(sql)"
-            case let .step(message): "SQL 执行失败：\(message)"
+            case let .open(path, code, message): String(localized: "无法打开数据库 \(path)（\(code)）：\(message)")
+            case let .prepare(sql, message): String(localized: "SQL 预编译失败：\(message)\n\(sql)")
+            case let .step(message): String(localized: "SQL 执行失败：\(message)")
             }
         }
 

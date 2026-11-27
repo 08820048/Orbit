@@ -241,14 +241,14 @@ final class OverlayView: NSView {
         if let w = MainActor.assumeIsolated({ overlay.hovered }) {
             let size = "\(Int(w.frame.width.rounded())) × \(Int(w.frame.height.rounded()))"
             let y = r.maxY + 8 + 28 > bounds.height ? r.minY + 8 : r.maxY + 8
-            drawPill([(w.title.isEmpty ? "窗口" : w.title, true), (size, false)], at: CGPoint(x: max(8, r.minX), y: y), height: 28)
+            drawPill([(w.title.isEmpty ? String(localized: "窗口") : w.title, true), (size, false)], at: CGPoint(x: max(8, r.minX), y: y), height: 28)
         }
     }
 
     private func drawHint() {
         let parts: [(String, Bool)] = MainActor.assumeIsolated { overlay.mode } == .region
-            ? [("拖动选择区域", false), ("空格", true), ("切换为窗口", false), ("⇧", true), ("锁定比例", false), ("Esc", true), ("取消", false)]
-            : [("点击截取此窗口", false), ("空格", true), ("切换为区域", false), ("Esc", true), ("取消", false)]
+            ? [(String(localized: "拖动选择区域"), false), (String(localized: "空格"), true), (String(localized: "切换为窗口"), false), ("⇧", true), (String(localized: "锁定比例"), false), ("Esc", true), (String(localized: "取消"), false)]
+            : [(String(localized: "点击截取此窗口"), false), (String(localized: "空格"), true), (String(localized: "切换为区域"), false), ("Esc", true), (String(localized: "取消"), false)]
         drawPill(parts, at: nil, height: 34)
     }
 

@@ -6,9 +6,9 @@ public enum CaptureKind: String, Codable, CaseIterable, Sendable {
 
     public var label: String {
         switch self {
-        case .region: "区域"
-        case .window: "窗口"
-        case .fullscreen: "全屏"
+        case .region: String(localized: "区域")
+        case .window: String(localized: "窗口")
+        case .fullscreen: String(localized: "全屏")
         }
     }
 }
@@ -63,10 +63,10 @@ public enum ScreenshotNaming {
 extension ScreenshotNaming {
     /// "Orbit 2026-11-26 21.03.12.png" -> "Orbit 2026-11-26 21.03.12 已编辑.png" (and "(2)" when taken).
     /// Editing an already edited or beautified screenshot does not pile up suffixes.
-    public static func editedName(from original: String, ext: String? = nil, suffix: String = "已编辑", exists: (String) -> Bool) -> String {
+    public static func editedName(from original: String, ext: String? = nil, suffix: String = String(localized: "已编辑"), exists: (String) -> Bool) -> String {
         let url = URL(fileURLWithPath: original)
         var base = url.deletingPathExtension().lastPathComponent
-        for known in [" 已编辑", " 已美化"] {
+        for known in [" 已编辑", " 已美化", " edited", " beautified"] {
             if let r = base.range(of: known) { base = String(base[..<r.lowerBound]) }
         }
         let ext = ext ?? (url.pathExtension.isEmpty ? "png" : url.pathExtension)

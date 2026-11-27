@@ -29,6 +29,9 @@ cp "$BIN_DIR/Orbit" "$APP/Contents/MacOS/Orbit"
 cp -R "$BIN_DIR"/Orbit_OrbitApp.bundle "$APP/Contents/Resources/"
 cp Packaging/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
+# Translations: SwiftUI and String(localized:) look them up in the main bundle (Chinese is the source language).
+for lproj in Packaging/Localization/*.lproj; do cp -R "$lproj" "$APP/Contents/Resources/"; done
+
 # Sparkle (software updates) lives next to the executable; point the executable at it.
 SPARKLE_FW=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 [[ -d "$SPARKLE_FW" ]] || { echo "Missing $SPARKLE_FW (run swift build first)"; exit 65; }

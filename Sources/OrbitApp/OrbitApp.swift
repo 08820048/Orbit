@@ -230,7 +230,7 @@ struct TopBar: View {
     @EnvironmentObject var model: AppModel
 
     private static let items: [(title: String, icon: Int, section: AppModel.Section)] = [
-        ("截图", GI.capture, .screenshots), ("分享", GI.share, .share), ("设置", GI.gear, .settings),
+        (String(localized: "截图"), GI.capture, .screenshots), (String(localized: "分享"), GI.share, .share), (String(localized: "设置"), GI.gear, .settings),
     ]
 
     var body: some View {

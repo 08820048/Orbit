@@ -20,9 +20,9 @@ public struct ScreenTimeReader: Sendable {
 
         public var description: String {
             switch self {
-            case .accessDenied: "没有完全磁盘访问权限，无法读取屏幕使用时间。"
-            case .unavailable: "没有找到屏幕使用时间数据库。"
-            case let .schemaChanged(detail): "屏幕使用时间数据库结构和预期不一致：\(detail)"
+            case .accessDenied: String(localized: "没有完全磁盘访问权限，无法读取屏幕使用时间。")
+            case .unavailable: String(localized: "没有找到屏幕使用时间数据库。")
+            case let .schemaChanged(detail): String(localized: "屏幕使用时间数据库结构和预期不一致：\(detail)")
             }
         }
     }

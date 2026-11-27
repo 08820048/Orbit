@@ -25,6 +25,11 @@ extension Color {
     }
 }
 
+extension Locale {
+    /// The language the interface is shown in (follows the system), for dates and names in text we build ourselves.
+    static var app: Locale { Locale(identifier: Bundle.main.preferredLocalizations.first ?? "zh-Hans") }
+}
+
 enum Theme {
     static let window = Color.dynamic(dark: (0x0A0F1C, 1), light: (0xE8EFFA, 1))
     static let sidebar = Color.dynamic(dark: (0xFFFFFF, 0.04), light: (0xFFFFFF, 0.55))
@@ -207,7 +212,7 @@ struct GlassSegmented<T: Hashable>: View {
         HStack(spacing: 2) {
             ForEach(options, id: \.self) { option in
                 let on = selection == option
-                Text(label(option))
+                Text(LocalizedStringKey(label(option)))
                     .font(.system(size: 12))
                     .foregroundStyle(on ? Color.white : Theme.text2)
                     .shadow(color: on ? .black.opacity(0.18) : .clear, radius: 0, y: 1)
@@ -241,7 +246,7 @@ struct TextTabs<T: Hashable>: View {
         HStack(spacing: 22) {
             ForEach(options, id: \.self) { option in
                 let on = selection == option
-                Text(label(option))
+                Text(LocalizedStringKey(label(option)))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(on ? Theme.text : Theme.text2)
                     .frame(height: 26)

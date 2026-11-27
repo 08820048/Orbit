@@ -34,7 +34,7 @@ struct BeautifyPage: View {
                 let l = BeautifyLayout.compute(content: model.outputSize, style: model.style, pixelsPerPoint: model.pixelsPerPoint)
                 Text("\(Int(l.canvas.width)) × \(Int(l.canvas.height)) px").font(.system(size: 12)).foregroundStyle(Theme.text2)
                 Spacer()
-                Text(model.style.backgroundValue == .none ? "透明背景：保存为 PNG 会保留透明，JPG 会铺成白底" : "在这一页点「完成」，保存的就是现在看到的样子")
+                Text(model.style.backgroundValue == .none ? "透明背景：保存为 PNG 会保留透明，JPG 会铺成白底" : String(localized: "在这一页点「完成」，保存的就是现在看到的样子"))
                     .font(.system(size: 12)).foregroundStyle(Theme.text2)
             }
             .padding(.horizontal, 24).frame(height: 40)
@@ -75,7 +75,7 @@ struct BeautifyInspector: View {
         }
     }
 
-    private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+    private func section<C: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.text2)
             content()
@@ -100,7 +100,7 @@ struct BeautifyInspector: View {
                         }
                         .frame(height: 50).frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        Text(p.rawValue).font(.system(size: 11)).foregroundStyle(on ? Theme.text : Theme.text2)
+                        Text(LocalizedStringKey(p.rawValue)).font(.system(size: 11)).foregroundStyle(on ? Theme.text : Theme.text2)
                     }
                     .padding(6)
                     .background(Theme.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -115,7 +115,7 @@ struct BeautifyInspector: View {
     // MARK: Background
 
     private enum BackgroundKind: Int, CaseIterable { case gradient, image, solid
-        var label: String { ["渐变", "图片", "纯色"][rawValue] }
+        var label: String { [String(localized: "渐变"), String(localized: "图片"), String(localized: "纯色")][rawValue] }
     }
 
     private var backgroundKind: BackgroundKind {
@@ -223,9 +223,9 @@ struct BeautifyInspector: View {
 
     private var appearance: some View {
         section("外观") {
-            slider("边距", value: $model.style.padding, range: 0...120, format: { "\(Int($0)) px" })
-            slider("圆角", value: $model.style.cornerRadius, range: 0...40, format: { "\(Int($0)) pt" })
-            slider("阴影", value: $model.style.shadow, range: 0...1, format: { "\(Int($0 * 100))%" })
+            slider(String(localized: "边距"), value: $model.style.padding, range: 0...120, format: { "\(Int($0)) px" })
+            slider(String(localized: "圆角"), value: $model.style.cornerRadius, range: 0...40, format: { "\(Int($0)) pt" })
+            slider(String(localized: "阴影"), value: $model.style.shadow, range: 0...1, format: { "\(Int($0 * 100))%" })
         }
     }
 
@@ -246,8 +246,8 @@ struct BeautifyInspector: View {
             GlassSegmented(options: BeautifyFrame.allCases, label: \.label, selection: $model.style.frame, fill: true)
             if style.frame != .none {
                 HStack(spacing: 10) {
-                    Text(style.frame == .window ? "标题" : "页面标题").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                    TextField(style.frame == .window ? "例如 账户设置" : "地址栏里显示的文字", text: $model.style.title)
+                    Text(style.frame == .window ? "标题" : String(localized: "页面标题")).font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    TextField(style.frame == .window ? "例如 账户设置" : String(localized: "地址栏里显示的文字"), text: $model.style.title)
                         .textFieldStyle(.plain).font(.system(size: 12))
                         .padding(.horizontal, 10).frame(height: 26)
                         .background(Theme.control, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
@@ -266,7 +266,7 @@ struct BeautifyInspector: View {
             FlowLayout(spacing: 6) {
                 ForEach(BeautifyRatio.allCases, id: \.self) { r in
                     let on = style.ratio == r
-                    Text(r.rawValue).font(.system(size: 12)).foregroundStyle(on ? Color.white : Theme.text2)
+                    Text(LocalizedStringKey(r.rawValue)).font(.system(size: 12)).foregroundStyle(on ? Color.white : Theme.text2)
                         .padding(.horizontal, 10).frame(height: 24)
                         .background(on ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Theme.control), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                         .contentShape(Rectangle())

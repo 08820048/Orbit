@@ -51,7 +51,7 @@ final class AppModel: ObservableObject {
         do { store = try HistoryStore() } catch {
             // Disk store unavailable: keep working in memory rather than crash.
             store = try! HistoryStore(url: nil)
-            lastError = "无法打开本地数据库，本次数据不会保存：\(error)"
+            lastError = String(localized: "无法打开本地数据库，本次数据不会保存：\(error)")
         }
         catalog.setOverrides((try? store.displayNameOverrides()) ?? [:])
         access = reader.checkAccess()
@@ -162,29 +162,34 @@ final class AppModel: ObservableObject {
         let cal = Calendar.current, now = Date()
         switch period {
         case .year: return "\(cal.component(.year, from: now))"
-        case .month: return "\(cal.component(.month, from: now)) 月"
-        case .week: return "最近 7 天"
+        case .month:
+            let m = cal.component(.month, from: now)
+            // Chinese counts months ("11 月"); other languages name them ("November").
+            if Locale.app.identifier.hasPrefix("zh") { return "\(m) 月" }
+            let f = DateFormatter(); f.locale = .app; f.dateFormat = "LLLL"
+            return f.string(from: now)
+        case .week: return String(localized: "最近 7 天")
         }
     }
 
     var coverageText: String {
-        guard let covered = summary?.coveredInterval else { return "还没有记录" }
+        guard let covered = summary?.coveredInterval else { return String(localized: "还没有记录") }
         let f = Date.FormatStyle().month(.defaultDigits).day(.defaultDigits)
         let days = summary?.daily.count ?? 0
-        return "记录自 \(covered.start.formatted(f))，共 \(days) 天"
+        return String(localized: "记录自 \(covered.start.formatted(f))，共 \(days) 天")
     }
 }
 
 enum Fmt {
     /// "48.4" + "小时", or "36" + "分钟" when under an hour.
     static func duration(_ seconds: TimeInterval) -> (value: String, unit: String) {
-        if seconds < 3600 { return (String(Int((seconds / 60).rounded())), "分钟") }
-        return (String(format: "%.1f", seconds / 3600), "小时")
+        if seconds < 3600 { return (String(Int((seconds / 60).rounded())), String(localized: "分钟")) }
+        return (String(format: "%.1f", seconds / 3600), String(localized: "小时"))
     }
 
     static func short(_ seconds: TimeInterval) -> String {
         let d = duration(seconds)
-        return d.unit == "小时" ? d.value + "h" : d.value + "m"
+        return d.unit == String(localized: "小时") ? d.value + "h" : d.value + "m"
     }
 
     static func long(_ seconds: TimeInterval) -> String {

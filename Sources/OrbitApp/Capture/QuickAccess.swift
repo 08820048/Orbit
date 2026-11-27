@@ -122,7 +122,7 @@ private struct QuickAccessView: View {
         }
     }
 
-    private var kindTitle: String { record.kind == .window ? "窗口截图" : record.kind == .fullscreen ? "全屏截图" : "区域截图" }
+    private var kindTitle: String { record.kind == .window ? String(localized: "窗口截图") : record.kind == .fullscreen ? String(localized: "全屏截图") : String(localized: "区域截图") }
 
     private var closeButton: some View {
         Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).frame(width: 20, height: 20)

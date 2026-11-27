@@ -52,7 +52,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
 
     /// Saves next to the original under a new "已编辑" name.
     func saveAsNew() {
-        let suffix = model.mode == .beautify ? "已美化" : "已编辑"
+        let suffix = model.mode == .beautify ? String(localized: "已美化") : String(localized: "已编辑")
         finish { image in try CaptureService.saveEdited(image, from: self.model.record, suffix: suffix) }
     }
 
@@ -72,7 +72,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
             window.close()
         } catch {
             let alert = NSAlert()
-            alert.messageText = "无法保存"
+            alert.messageText = String(localized: "无法保存")
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -85,11 +85,11 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard model.isDirty, !skipPrompt else { return true }
         let alert = NSAlert()
-        alert.messageText = "要保存对这张截图的修改吗？"
-        alert.informativeText = "不保存的话，这些修改会丢失。"
-        alert.addButton(withTitle: "保存为新截图")
-        alert.addButton(withTitle: "不保存")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = String(localized: "要保存对这张截图的修改吗？")
+        alert.informativeText = String(localized: "不保存的话，这些修改会丢失。")
+        alert.addButton(withTitle: String(localized: "保存为新截图"))
+        alert.addButton(withTitle: String(localized: "不保存"))
+        alert.addButton(withTitle: String(localized: "取消"))
         alert.beginSheetModal(for: sender) { [weak self] response in
             guard let self else { return }
             switch response {

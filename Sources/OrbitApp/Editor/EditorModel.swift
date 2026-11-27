@@ -10,16 +10,16 @@ final class EditorModel: ObservableObject {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .select: "选择"
-            case .arrow: "箭头"
-            case .rectangle: "矩形"
-            case .ellipse: "椭圆"
-            case .line: "直线"
-            case .text: "文字"
-            case .marker: "序号"
-            case .highlight: "荧光笔"
-            case .blur: "模糊 / 马赛克"
-            case .crop: "裁剪"
+            case .select: String(localized: "选择")
+            case .arrow: String(localized: "箭头")
+            case .rectangle: String(localized: "矩形")
+            case .ellipse: String(localized: "椭圆")
+            case .line: String(localized: "直线")
+            case .text: String(localized: "文字")
+            case .marker: String(localized: "序号")
+            case .highlight: String(localized: "荧光笔")
+            case .blur: String(localized: "模糊 / 马赛克")
+            case .crop: String(localized: "裁剪")
             }
         }
         var symbol: String {

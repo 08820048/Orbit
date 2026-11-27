@@ -120,7 +120,7 @@ private struct ScreenshotsContent: View {
         }
     }
 
-    private func chip(_ title: String, _ symbol: String, _ action: CaptureAction) -> some View {
+    private func chip(_ title: LocalizedStringKey, _ symbol: String, _ action: CaptureAction) -> some View {
         Button { capture.perform(action, fromUI: true) } label: {
             HStack(spacing: 8) {
                 Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accentHi)
@@ -141,7 +141,7 @@ private struct ScreenshotsContent: View {
 
     private var filterRow: some View {
         HStack(spacing: 12) {
-            GlassSegmented(options: [CaptureKind?.none, .region, .window, .fullscreen], label: { $0?.label ?? "全部" }, selection: $kind)
+            GlassSegmented(options: [CaptureKind?.none, .region, .window, .fullscreen], label: { $0?.label ?? String(localized: "全部") }, selection: $kind)
             Spacer()
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.text2)
@@ -174,8 +174,8 @@ private struct ScreenshotsContent: View {
     private var empty: some View {
         VStack(spacing: 10) {
             Image(systemName: "camera.viewfinder").font(.system(size: 34)).foregroundStyle(Theme.accentHi)
-            Text(total == 0 ? "还没有截图" : "没有符合条件的截图").font(.system(size: 15, weight: .semibold))
-            Text(total == 0 ? "按 \(settings.combo(.region).display) 截第一张。截图会保存在 \(Self.shortPath(settings.folderPath))。" : "换一个筛选条件或搜索词试试。")
+            Text(total == 0 ? "还没有截图" : String(localized: "没有符合条件的截图")).font(.system(size: 15, weight: .semibold))
+            Text(total == 0 ? "按 \(settings.combo(.region).display) 截第一张。截图会保存在 \(Self.shortPath(settings.folderPath))。" : String(localized: "换一个筛选条件或搜索词试试。"))
                 .font(.system(size: 12)).foregroundStyle(Theme.text2)
         }
         .frame(maxWidth: .infinity)
@@ -200,13 +200,13 @@ private struct ScreenshotsContent: View {
     static func sections(_ records: [ScreenshotRecord]) -> [DaySection] {
         let cal = Calendar.current
         let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
-        f.dateFormat = "M月d日 EEEE"
+        f.locale = .app
+        f.dateFormat = String(localized: "M月d日 EEEE")
         var out: [DaySection] = []
         var current: (day: Date, items: [ScreenshotRecord])?
         func flush() {
             guard let c = current else { return }
-            let title = cal.isDateInToday(c.day) ? "今天" : cal.isDateInYesterday(c.day) ? "昨天" : f.string(from: c.day)
+            let title = cal.isDateInToday(c.day) ? String(localized: "今天") : cal.isDateInYesterday(c.day) ? String(localized: "昨天") : f.string(from: c.day)
             out.append(DaySection(title: title, items: c.items))
         }
         for r in records {
@@ -287,7 +287,7 @@ private struct ShotTile: View {
     }
 
     private var meta: String {
-        if record.kind == .window, let s = record.source, !s.isEmpty { return "窗口 · \(s)" }
+        if record.kind == .window, let s = record.source, !s.isEmpty { return String(localized: "窗口 · \(s)") }
         return "\(record.kind.label) · \(record.pointSize.width) × \(record.pointSize.height)"
     }
 
@@ -361,10 +361,10 @@ private struct ScreenshotDetail: View {
             Text(record.url.pathExtension.uppercased()).font(.system(size: 12)).foregroundStyle(Theme.text2).padding(.top, 4)
             VStack(alignment: .leading, spacing: 14) {
                 line("时间", Self.time(record.createdAt))
-                line("方式", record.kind.label + "截图")
+                line("方式", record.kind.label)
                 if let s = record.source, !s.isEmpty { line("来源", s) }
                 line("尺寸", "\(record.pixelWidth) × \(record.pixelHeight)（\(Int(record.scale))x）")
-                line("大小", ByteCountFormatter.string(fromByteCount: record.byteCount, countStyle: .file))
+                line("文件大小", ByteCountFormatter.string(fromByteCount: record.byteCount, countStyle: .file))
                 line("位置", Self.short(record.folder))
             }
             .padding(.top, 26)
@@ -386,7 +386,7 @@ private struct ScreenshotDetail: View {
         }
     }
 
-    private func line(_ k: String, _ v: String) -> some View {
+    private func line(_ k: LocalizedStringKey, _ v: String) -> some View {
         HStack(alignment: .top) {
             Text(k).font(.system(size: 13)).foregroundStyle(Theme.text2).frame(width: 70, alignment: .leading)
             Text(v).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
@@ -414,10 +414,10 @@ private struct ScreenshotDetail: View {
 
     static func time(_ date: Date) -> String {
         let cal = Calendar.current, f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
-        if cal.isDateInToday(date) { f.dateFormat = "'今天' HH:mm" }
-        else if cal.isDateInYesterday(date) { f.dateFormat = "'昨天' HH:mm" }
-        else { f.dateFormat = "yyyy年M月d日 HH:mm" }
+        f.locale = .app
+        if cal.isDateInToday(date) { f.dateFormat = String(localized: "'今天' HH:mm") }
+        else if cal.isDateInYesterday(date) { f.dateFormat = String(localized: "'昨天' HH:mm") }
+        else { f.dateFormat = String(localized: "yyyy年M月d日 HH:mm") }
         return f.string(from: date)
     }
 
@@ -466,7 +466,7 @@ struct PermissionGuide: View {
         }
     }
 
-    private func step(_ n: Int, _ title: String, _ sub: String?) -> some View {
+    private func step(_ n: Int, _ title: LocalizedStringKey, _ sub: LocalizedStringKey?) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Text("\(n)").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accentHi)
                 .frame(width: 24, height: 24).background(Theme.control, in: Circle())
