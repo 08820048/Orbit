@@ -110,7 +110,11 @@ private struct ScreenshotsContent: View {
             Spacer(minLength: 12)
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                TextField("搜索文件名、应用", text: $search).textFieldStyle(.plain).font(.system(size: 12))
+                if CommandLine.arguments.contains("--render-check") {
+                    Text("搜索文件名、应用").font(.system(size: 12)).foregroundStyle(Theme.text2)   // offscreen renders cannot draw a text field
+                } else {
+                    TextField("搜索文件名、应用", text: $search).textFieldStyle(.plain).font(.system(size: 12))
+                }
             }
             .padding(.horizontal, 10).frame(width: 220, height: 30)
             .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))

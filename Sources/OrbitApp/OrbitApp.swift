@@ -328,7 +328,8 @@ enum RenderCheck {
     static func seedSampleScreenshots(_ model: AppModel) -> ScreenshotRecord? {
         guard ProcessInfo.processInfo.environment["ORBIT_SAMPLE_SHOTS"] != nil,
               ProcessInfo.processInfo.environment["ORBIT_STORE_PATH"] != nil else { return nil }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("orbit-sample-shots", isDirectory: true)
+        let siteShots = ProcessInfo.processInfo.environment["ORBIT_SITE_SHOTS"] != nil
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(siteShots ? "orbit-site-shots" : "orbit-sample-shots", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let palettes: [(NSColor, NSColor)] = [
             (NSColor(srgbRed: 0.17, green: 0.23, blue: 0.55, alpha: 1), NSColor(srgbRed: 0.42, green: 0.25, blue: 0.63, alpha: 1)),
@@ -345,6 +346,13 @@ enum RenderCheck {
             let size = i == 1 ? NSSize(width: 2400, height: 500) : i == 2 ? NSSize(width: 400, height: 1600) : NSSize(width: 812, height: 536)
             let (a, b) = palettes[i % palettes.count]
             let img = NSImage(size: size, flipped: false) { rect in
+                if siteShots, let photo = BackgroundStore.builtin(BuiltinBackground.all[i % BuiltinBackground.all.count].id) {
+                    // Marketing renders: real pictures instead of the flat placeholder bars.
+                    let scale = max(rect.width / photo.size.width, rect.height / photo.size.height)
+                    let w = photo.size.width * scale, h = photo.size.height * scale
+                    photo.draw(in: NSRect(x: (rect.width - w) / 2, y: (rect.height - h) / 2, width: w, height: h))
+                    return true
+                }
                 NSGradient(starting: a, ending: b)?.draw(in: rect, angle: 315)
                 NSColor.white.withAlphaComponent(0.14).setFill()
                 for k in 0..<4 { NSBezierPath(roundedRect: NSRect(x: 28, y: rect.height - 70 - CGFloat(k) * 60, width: CGFloat(300 + (i * 40 + k * 70) % 380), height: 34), xRadius: 8, yRadius: 8).fill() }
@@ -549,7 +557,7 @@ enum CaptureSelfTest {
             let title: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 40, weight: .bold), .foregroundColor: NSColor.white]
             let label: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 24), .foregroundColor: NSColor(white: 0.8, alpha: 1)]
             ("账户信息" as NSString).draw(at: NSPoint(x: 600, y: 70), withAttributes: title)
-            for (k, row) in [("用户名", "xuyi"), ("邮箱", "marshmitch884@gmail.com"), ("手机号", "138 0013 8000")].enumerated() {
+            for (k, row) in [("用户名", "alex"), ("邮箱", "alex@example.com"), ("手机号", "138 0013 8000")].enumerated() {
                 let y = 220 + CGFloat(k) * 170
                 (row.0 as NSString).draw(at: NSPoint(x: 600, y: y), withAttributes: label)
                 NSColor(white: 1, alpha: 0.08).setFill()
@@ -685,7 +693,7 @@ enum CaptureSelfTest {
             guard let cg, let data = try? CaptureService.encode(cg, as: .png) else { return }
             try? data.write(to: dir.appendingPathComponent(name))
         }
-        var mine = BeautifyStyle(); mine.title = "账户设置"; mine.signature = "徐毅"
+        var mine = BeautifyStyle(); mine.title = "账户设置"; mine.signature = "Alex"
         for p in BeautifyPreset.allCases { save(BeautifyRenderer.render(content: content, style: p.style(keeping: mine), pixelsPerPoint: 2), "preset-\(p.rawValue).png") }
         var s = BeautifyPreset.social.style(keeping: mine)
         s.background = "gradient:FF8A5B,FF4D8D"; s.frame = .window
