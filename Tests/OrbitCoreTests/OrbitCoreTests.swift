@@ -381,3 +381,106 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(try ScreenshotStore(url: url).record(id: r.id) == r)
     }
 }
+
+@Suite struct AnnotationGeometryTests {
+    private func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x, y: y) }
+
+    @Test func rectFromDragNormalisesAndCanBeSquare() {
+        #expect(GeometryTools.rect(from: pt(100, 80), to: pt(40, 20), square: false) == CGRect(x: 40, y: 20, width: 60, height: 60))
+        let sq = GeometryTools.rect(from: pt(10, 10), to: pt(70, 40), square: true)
+        #expect(sq.width == sq.height && sq.width == 60)
+        let sqUpLeft = GeometryTools.rect(from: pt(100, 100), to: pt(70, 40), square: true)
+        #expect(sqUpLeft == CGRect(x: 40, y: 40, width: 60, height: 60))
+    }
+
+    @Test func lineEndpointsSnapToFortyFiveDegrees() {
+        let h = GeometryTools.endpoint(from: pt(0, 0), to: pt(100, 8), snap: true)
+        #expect(abs(h.y) < 0.001 && abs(h.x - hypot(100, 8)) < 0.001)
+        let v = GeometryTools.endpoint(from: pt(0, 0), to: pt(6, 90), snap: true)
+        #expect(abs(v.x) < 0.001)
+        let d = GeometryTools.endpoint(from: pt(0, 0), to: pt(50, 40), snap: true)
+        #expect(abs(d.x - d.y) < 0.001)
+        #expect(GeometryTools.endpoint(from: pt(0, 0), to: pt(50, 40), snap: false) == pt(50, 40))
+    }
+
+    @Test func hitTestingFindsOutlinesAndLines() {
+        var rect = Annotation(shape: .rectangle(CGRect(x: 100, y: 100, width: 200, height: 100)))
+        rect.lineWidth = 6
+        #expect(rect.hit(pt(100, 150), tolerance: 4))        // on the edge
+        #expect(!rect.hit(pt(200, 150), tolerance: 4))       // the empty middle stays click-through
+        #expect(!rect.hit(pt(10, 10), tolerance: 4))
+        var arrow = Annotation(shape: .arrow(from: pt(0, 0), to: pt(100, 0)))
+        arrow.lineWidth = 6
+        #expect(arrow.hit(pt(50, 5), tolerance: 4))
+        #expect(!arrow.hit(pt(50, 40), tolerance: 4))
+        let blur = Annotation(shape: .blur(CGRect(x: 0, y: 0, width: 50, height: 50)))
+        #expect(blur.hit(pt(25, 25), tolerance: 4))          // regions are hit anywhere inside
+    }
+
+    @Test func movingShiftsEveryPoint() {
+        let a = Annotation(shape: .arrow(from: pt(1, 2), to: pt(3, 4))).moved(by: CGVector(dx: 10, dy: 20))
+        #expect(a.shape == .arrow(from: pt(11, 22), to: pt(13, 24)))
+        let t = Annotation(shape: .text(origin: pt(5, 5), string: "hi")).moved(by: CGVector(dx: -5, dy: 1))
+        #expect(t.shape == .text(origin: pt(0, 6), string: "hi"))
+    }
+
+    @Test func resizingDragsOneHandleAndKeepsTheOppositeCorner() {
+        let r = CGRect(x: 100, y: 100, width: 100, height: 50)
+        #expect(RectGeometry.resize(r, handle: .bottomRight, to: pt(250, 220)) == CGRect(x: 100, y: 100, width: 150, height: 120))
+        #expect(RectGeometry.resize(r, handle: .left, to: pt(60, 999)) == CGRect(x: 60, y: 100, width: 140, height: 50))
+        // dragging past the opposite edge flips instead of producing a negative size
+        #expect(RectGeometry.resize(r, handle: .right, to: pt(50, 0)) == CGRect(x: 50, y: 100, width: 50, height: 50))
+        let sq = RectGeometry.resize(r, handle: .bottomRight, to: pt(260, 160), square: true)
+        #expect(sq.width == sq.height)
+        let arrow = Annotation(shape: .arrow(from: pt(0, 0), to: pt(10, 0))).resized(.end, to: pt(30, 40), constrain: false)
+        #expect(arrow.shape == .arrow(from: pt(0, 0), to: pt(30, 40)))
+    }
+
+    @Test func cropRespectsBoundsMinimumSizeAndRatio() {
+        let bounds = CGRect(x: 0, y: 0, width: 800, height: 600)
+        let start = CGRect(x: 100, y: 100, width: 400, height: 300)
+        let grown = CropMath.resize(start, handle: .bottomRight, to: pt(2000, 2000), bounds: bounds, ratio: nil)
+        #expect(grown == CGRect(x: 100, y: 100, width: 700, height: 500))
+        let tiny = CropMath.resize(start, handle: .bottomRight, to: pt(101, 101), bounds: bounds, ratio: nil)
+        #expect(tiny.width >= 24 && tiny.height >= 24)
+        let locked = CropMath.resize(start, handle: .bottomRight, to: pt(500, 500), bounds: bounds, ratio: 1)
+        #expect(abs(locked.width - locked.height) < 0.001)
+        let fitted = CropMath.fit(CGRect(x: 0, y: 0, width: 800, height: 600), ratio: 16.0 / 9.0)
+        #expect(abs(fitted.width / fitted.height - 16.0 / 9.0) < 0.001 && fitted.midX == 400 && fitted.midY == 300)
+        #expect(GeometryTools.clamp(CGRect(x: 700, y: -20, width: 200, height: 100), in: bounds) == CGRect(x: 600, y: 0, width: 200, height: 100))
+    }
+
+    @Test func historyUndoesRedoesAndTracksDirty() {
+        var h = EditHistory()
+        #expect(!h.canUndo && !h.isDirty)
+        let a = Annotation(shape: .rectangle(CGRect(x: 0, y: 0, width: 10, height: 10)))
+        h.commit(EditSnapshot(items: [a]))
+        #expect(h.canUndo && !h.canRedo && h.isDirty)
+        h.commit(EditSnapshot(items: [a], crop: CGRect(x: 0, y: 0, width: 5, height: 5)))
+        #expect(h.undo() && h.current.crop == nil && h.current.items.count == 1)
+        #expect(h.canRedo)
+        #expect(h.redo() && h.current.crop != nil)
+        h.undo(); h.undo()
+        #expect(!h.isDirty && !h.canUndo)
+        h.commit(EditSnapshot(items: [a]))
+        h.undo()
+        h.commit(EditSnapshot(items: []))      // an identical state is not a new step
+        #expect(!h.canUndo)
+        h.commit(EditSnapshot(items: [a]))
+        h.undo()
+        h.commit(EditSnapshot(items: [Annotation(shape: .line(from: pt(0, 0), to: pt(1, 1)))]))
+        #expect(!h.canRedo)                    // a new edit clears redo
+    }
+
+    @Test func scalingAndEditedNames() {
+        #expect(AnnotationScale.factor(forImageWidth: 600) == 1)
+        #expect(AnnotationScale.factor(forImageWidth: 2400) == 2)
+        #expect(AnnotationScale.factor(forImageWidth: 10_000) == 4)
+        #expect(AnnotationScale.lineWidth(.thick, imageWidth: 1200) > AnnotationScale.lineWidth(.thin, imageWidth: 1200))
+        let n1 = ScreenshotNaming.editedName(from: "Orbit 2026-11-26 21.03.12.png", exists: { _ in false })
+        #expect(n1 == "Orbit 2026-11-26 21.03.12 已编辑.png")
+        let n2 = ScreenshotNaming.editedName(from: n1, exists: { $0 == n1 })
+        #expect(n2 == "Orbit 2026-11-26 21.03.12 已编辑 (2).png")
+        #expect(ScreenshotNaming.editedName(from: "/a/b/Orbit x.jpg", exists: { _ in false }) == "Orbit x 已编辑.jpg")
+    }
+}

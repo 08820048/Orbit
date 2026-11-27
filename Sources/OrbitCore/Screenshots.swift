@@ -60,6 +60,21 @@ public enum ScreenshotNaming {
     }
 }
 
+extension ScreenshotNaming {
+    /// "Orbit 2026-11-26 21.03.12.png" -> "Orbit 2026-11-26 21.03.12 已编辑.png" (and "(2)" when taken).
+    /// Editing an already edited screenshot does not pile up suffixes.
+    public static func editedName(from original: String, ext: String? = nil, exists: (String) -> Bool) -> String {
+        let url = URL(fileURLWithPath: original)
+        var base = url.deletingPathExtension().lastPathComponent
+        if let r = base.range(of: " 已编辑") { base = String(base[..<r.lowerBound]) }
+        let ext = ext ?? (url.pathExtension.isEmpty ? "png" : url.pathExtension)
+        var name = "\(base) 已编辑.\(ext)"
+        var n = 2
+        while exists(name) { name = "\(base) 已编辑 (\(n)).\(ext)"; n += 1 }
+        return name
+    }
+}
+
 /// The local index behind the screenshot library. The image files live in the user's folder (default `~/Pictures/Orbit`);
 /// this store remembers when and how each was taken, so the library can filter, search and show totals quickly.
 ///
