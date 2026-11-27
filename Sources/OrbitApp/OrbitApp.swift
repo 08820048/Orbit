@@ -449,7 +449,67 @@ enum RenderCheck {
 /// into `<dir>` (never the user's library), prints what happened and exits. For verifying capture without clicking.
 @MainActor
 enum CaptureSelfTest {
+    /// `--annotate-selftest <dir>`: draws every kind of annotation onto a made-up screenshot and saves the result, so the
+    /// renderer (including the pixel-destroying blur) can be looked at without opening the editor.
+    static func annotateIfRequested() {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--annotate-selftest"), i + 1 < args.count else { return }
+        let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let size = NSSize(width: 1680, height: 1040)
+        let img = NSImage(size: size, flipped: true) { rect in
+            NSColor(srgbRed: 0.12, green: 0.13, blue: 0.19, alpha: 1).setFill(); rect.fill()
+            NSColor(white: 1, alpha: 0.05).setFill(); NSRect(x: 0, y: 0, width: 400, height: rect.height).fill()
+            let title: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 40, weight: .bold), .foregroundColor: NSColor.white]
+            let label: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 24), .foregroundColor: NSColor(white: 0.8, alpha: 1)]
+            ("账户信息" as NSString).draw(at: NSPoint(x: 600, y: 70), withAttributes: title)
+            for (k, row) in [("用户名", "xuyi"), ("邮箱", "marshmitch884@gmail.com"), ("手机号", "138 0013 8000")].enumerated() {
+                let y = 220 + CGFloat(k) * 170
+                (row.0 as NSString).draw(at: NSPoint(x: 600, y: y), withAttributes: label)
+                NSColor(white: 1, alpha: 0.08).setFill()
+                NSBezierPath(roundedRect: NSRect(x: 600, y: y + 40, width: 840, height: 80), xRadius: 16, yRadius: 16).fill()
+                (row.1 as NSString).draw(at: NSPoint(x: 630, y: y + 62), withAttributes: label)
+            }
+            return true
+        }
+        guard let base = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        let w = Double(base.width)
+        func style(_ a: Annotation, _ level: LineLevel = .medium) -> Annotation {
+            var a = a; a.lineWidth = AnnotationScale.lineWidth(level, imageWidth: w); return a
+        }
+        var items: [Annotation] = []
+        var mosaic = Annotation(shape: .blur(CGRect(x: 620, y: 448, width: 330, height: 44))); mosaic.blurMode = .pixelate
+        items.append(mosaic)
+        var blur = Annotation(shape: .blur(CGRect(x: 620, y: 788, width: 190, height: 44))); blur.blurMode = .blur
+        items.append(blur)
+        items.append(style(Annotation(shape: .arrow(from: CGPoint(x: 1300, y: 260), to: CGPoint(x: 1010, y: 280)))))
+        var txt = Annotation(shape: .text(origin: CGPoint(x: 1300, y: 235), string: "改成新的昵称"))
+        txt.fontSize = AnnotationScale.fontSize(.medium, imageWidth: w)
+        txt.textSize = AnnotationRenderer.measureText("改成新的昵称", fontSize: txt.fontSize, background: true)
+        items.append(txt)
+        var rect = style(Annotation(shape: .rectangle(CGRect(x: 585, y: 40, width: 880, height: 110))), .thick); rect.color = .blue
+        items.append(rect)
+        var ell = style(Annotation(shape: .ellipse(CGRect(x: 1180, y: 890, width: 240, height: 110)))); ell.color = .green
+        items.append(ell)
+        var ln = style(Annotation(shape: .line(from: CGPoint(x: 600, y: 900), to: CGPoint(x: 1100, y: 900))), .thin); ln.color = .orange
+        items.append(ln)
+        var plain = Annotation(shape: .text(origin: CGPoint(x: 600, y: 930), string: "无底色文字 + 阴影"))
+        plain.textBackground = false; plain.color = .orange; plain.fontSize = AnnotationScale.fontSize(.large, imageWidth: w)
+        plain.textSize = AnnotationRenderer.measureText("无底色文字 + 阴影", fontSize: plain.fontSize, background: false)
+        items.append(plain)
+
+        func save(_ cg: CGImage?, _ name: String) {
+            guard let cg, let data = try? CaptureService.encode(cg, as: .png) else { return }
+            try? data.write(to: dir.appendingPathComponent(name))
+        }
+        save(AnnotationRenderer.render(base: base, snapshot: EditSnapshot(items: items)), "annotated.png")
+        save(AnnotationRenderer.render(base: base, snapshot: EditSnapshot(items: items, crop: CGRect(x: 560, y: 180, width: 960, height: 520))), "annotated-cropped.png")
+        FileHandle.standardError.write(Data("SELFTEST annotate done\n".utf8))
+        exit(0)
+    }
+
     static func runIfRequested(_ model: AppModel) async {
+        annotateIfRequested()
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--capture-selftest"), i + 1 < args.count else { return }
         let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
