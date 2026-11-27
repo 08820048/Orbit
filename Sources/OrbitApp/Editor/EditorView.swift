@@ -10,10 +10,14 @@ struct EditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            toolsRow
-            propertiesRow
-            EditorCanvas(model: model)
-            statusBar
+            if model.mode == .annotate {
+                toolsRow
+                propertiesRow
+                EditorCanvas(model: model)
+                statusBar
+            } else {
+                BeautifyPage(model: model)
+            }
         }
         .background(Theme.window)
         .foregroundStyle(Theme.text)
@@ -41,10 +45,15 @@ struct EditorView: View {
         }
         .padding(.horizontal, 20).frame(height: 52)
         .overlay {
+            // Page switch in the middle; the file name sits beside the traffic lights.
+            GlassSegmented(options: EditorModel.Mode.allCases, label: \.rawValue, selection: $model.mode)
+        }
+        .overlay(alignment: .leading) {
             HStack(spacing: 6) {
-                Text(model.record.url.deletingPathExtension().lastPathComponent).font(.system(size: 13, weight: .medium))
+                Text(model.record.url.deletingPathExtension().lastPathComponent).font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
                 if model.isDirty { Text("· 已编辑").font(.system(size: 12)).foregroundStyle(Theme.text2) }
             }
+            .padding(.leading, 84).frame(maxWidth: 300, alignment: .leading)
             .allowsHitTesting(false)
         }
     }

@@ -32,7 +32,8 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         window = w
     }
 
-    func show() {
+    func show(mode: EditorModel.Mode? = nil) {
+        if let mode { model.mode = mode }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
@@ -40,7 +41,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     // MARK: Actions
 
     func copyToClipboard() {
-        guard let image = model.renderFinal(), let data = try? CaptureService.encode(image, as: .png) else { NSSound.beep(); return }
+        guard let image = model.renderOutput(), let data = try? CaptureService.encode(image, as: .png) else { NSSound.beep(); return }
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setData(data, forType: .png)
@@ -48,7 +49,8 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
 
     /// Saves next to the original under a new "已编辑" name.
     func saveAsNew() {
-        finish { image in try CaptureService.saveEdited(image, from: self.model.record) }
+        let suffix = model.mode == .beautify ? "已美化" : "已编辑"
+        finish { image in try CaptureService.saveEdited(image, from: self.model.record, suffix: suffix) }
     }
 
     /// Replaces the original (it goes to the Trash first).
@@ -57,8 +59,9 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     }
 
     private func finish(_ save: (CGImage) throws -> ScreenshotRecord) {
-        guard model.isDirty else { requestClose(); return }
-        guard let image = model.renderFinal() else { NSSound.beep(); return }
+        // On the beautify page there is always something to save; on the annotate page only after an edit.
+        guard model.isDirty || model.mode == .beautify else { requestClose(); return }
+        guard let image = model.renderOutput() else { NSSound.beep(); return }
         do {
             let record = try save(image)
             capture.didSaveEdited(record, image: image)
@@ -105,11 +108,11 @@ final class EditorManager {
     static let shared = EditorManager()
     private var controllers: [UUID: EditorWindowController] = [:]
 
-    func open(_ record: ScreenshotRecord, capture: CaptureCoordinator) {
-        if let existing = controllers[record.id] { existing.show(); return }
+    func open(_ record: ScreenshotRecord, capture: CaptureCoordinator, mode: EditorModel.Mode? = nil) {
+        if let existing = controllers[record.id] { existing.show(mode: mode); return }
         guard let c = EditorWindowController(record: record, capture: capture) else { NSSound.beep(); return }
         controllers[record.id] = c
-        c.show()
+        c.show(mode: mode)
     }
 
     fileprivate func closed(_ id: UUID) { controllers[id] = nil }

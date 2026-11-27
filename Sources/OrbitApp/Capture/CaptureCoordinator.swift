@@ -138,8 +138,10 @@ final class CaptureCoordinator: ObservableObject {
             open: { NSWorkspace.shared.open(record.url) }))
     }
 
-    /// Opens the annotation editor for a screenshot.
-    func edit(_ record: ScreenshotRecord) { EditorManager.shared.open(record, capture: self) }
+    /// Opens the editor for a screenshot, on the annotate page or (`beautify`) the beautify page.
+    func edit(_ record: ScreenshotRecord, beautify: Bool = false) {
+        EditorManager.shared.open(record, capture: self, mode: beautify ? .beautify : nil)
+    }
 
     /// The editor saved a picture: index it (a new file or the replaced original) and show the result like a fresh capture.
     func didSaveEdited(_ record: ScreenshotRecord, image: CGImage) {

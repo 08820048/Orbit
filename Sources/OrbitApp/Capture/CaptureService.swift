@@ -160,13 +160,13 @@ enum CaptureService {
         record.url.pathExtension.lowercased() == "png" ? .png : .jpg
     }
 
-    /// Saves the edited picture next to the original as "<name> 已编辑.png"; the original stays.
-    static func saveEdited(_ image: CGImage, from original: ScreenshotRecord, date: Date = Date()) throws -> ScreenshotRecord {
+    /// Saves the edited picture next to the original as "<name> 已编辑.png" (or 已美化); the original stays.
+    static func saveEdited(_ image: CGImage, from original: ScreenshotRecord, suffix: String = "已编辑", date: Date = Date()) throws -> ScreenshotRecord {
         let fmt = format(of: original)
         let data = try encode(image, as: fmt)
         let fm = FileManager.default
         let folder = original.url.deletingLastPathComponent()
-        let name = ScreenshotNaming.editedName(from: original.fileName, ext: fmt.fileExtension) { fm.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        let name = ScreenshotNaming.editedName(from: original.fileName, ext: fmt.fileExtension, suffix: suffix) { fm.fileExists(atPath: folder.appendingPathComponent($0).path) }
         let url = folder.appendingPathComponent(name)
         do { try data.write(to: url, options: .atomic) } catch { throw CaptureError.saving(error.localizedDescription) }
         return ScreenshotRecord(path: url.path, createdAt: date, kind: original.kind, pixelWidth: image.width, pixelHeight: image.height,

@@ -271,6 +271,7 @@ private struct ShotTile: View {
             .onDrag { NSItemProvider(contentsOf: record.url) ?? NSItemProvider() }
             .contextMenu {
                 Button("编辑") { capture.edit(record) }
+                Button("美化") { capture.edit(record, beautify: true) }
                 Button("复制") { capture.copy(record) }
                 Button("在 Finder 中显示") { capture.reveal(record) }
                 Divider()
@@ -371,6 +372,9 @@ private struct ScreenshotDetail: View {
                 Button("复制") { capture.copy(record) }.glassButton(primary: true)
                 HStack(spacing: 10) {
                     Button("编辑") { capture.edit(record) }.glassButton()
+                    Button("美化") { capture.edit(record, beautify: true) }.glassButton()
+                }
+                HStack(spacing: 10) {
                     ShareLink(item: record.url) { Text("分享…") }.buttonStyle(GlassButtonStyle()).focusable(false)
                     Button("在 Finder 中显示") { capture.reveal(record) }.glassButton()
                 }

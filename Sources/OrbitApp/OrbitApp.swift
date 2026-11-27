@@ -506,6 +506,8 @@ enum CaptureSelfTest {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         guard let record = try? CaptureService.save(base, kind: .region, source: "Safari", scale: 2, format: .png, folder: dir, date: Date()),
               let controller = EditorWindowController(record: record, capture: model.capture) else { return }
+        let savedStyle = BeautifyStore.load()          // the self-test changes the style; put it back afterwards
+        defer { BeautifyStore.save(savedStyle) }
         let window = controller.window!
         window.setFrame(NSRect(x: 100, y: 100, width: 1180, height: 820), display: true)
         window.orderFrontRegardless()
@@ -529,6 +531,12 @@ enum CaptureSelfTest {
         controller.model.applyCrop()
         controller.model.tool = .text
         snap("editor-after-crop.png")
+        controller.model.tool = .select
+        controller.model.mode = .beautify
+        snap("editor-beautify.png")
+        controller.model.applyPreset(.document)
+        snap("editor-beautify-document.png")
+        controller.model.applyPreset(.social)
         // Save as a new screenshot and check the result like a user would.
         controller.saveAsNew()
         let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).filter { $0.hasSuffix(".png") && $0.hasPrefix("Orbit") }.sorted()
@@ -539,6 +547,31 @@ enum CaptureSelfTest {
             FileHandle.standardError.write(Data("SELFTEST edited image: \(edited.pixelWidth)x\(edited.pixelHeight), original untouched: \(FileManager.default.fileExists(atPath: record.path))\n".utf8))
         }
         FileHandle.standardError.write(Data("SELFTEST editor done\n".utf8))
+        BeautifyStore.save(savedStyle)
+        exit(0)
+    }
+
+    /// `--beautify-selftest <dir>`: renders the presets and window frames from the sample screenshot.
+    static func beautifyIfRequested() {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--beautify-selftest"), i + 1 < args.count, let (base, items) = sampleEdit() else { return }
+        let dir = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let content = AnnotationRenderer.render(base: base, snapshot: EditSnapshot(items: items)) else { return }
+        func save(_ cg: CGImage?, _ name: String) {
+            guard let cg, let data = try? CaptureService.encode(cg, as: .png) else { return }
+            try? data.write(to: dir.appendingPathComponent(name))
+        }
+        var mine = BeautifyStyle(); mine.title = "账户设置"; mine.signature = "徐毅"
+        for p in BeautifyPreset.allCases { save(BeautifyRenderer.render(content: content, style: p.style(keeping: mine), pixelsPerPoint: 2), "preset-\(p.rawValue).png") }
+        var s = BeautifyPreset.social.style(keeping: mine)
+        s.background = "gradient:FF8A5B,FF4D8D"; s.frame = .window
+        save(BeautifyRenderer.render(content: content, style: s, pixelsPerPoint: 2), "frame-window.png")
+        s.background = "gradient:1FD1A5,2E7CF6"; s.frame = .browser; s.title = "页面标题"
+        save(BeautifyRenderer.render(content: content, style: s, pixelsPerPoint: 2), "frame-browser.png")
+        s.frame = .window; s.ratio = .square; s.background = "builtin:fjord"
+        save(BeautifyRenderer.render(content: content, style: s, pixelsPerPoint: 2), "ratio-square-photo.png")
+        FileHandle.standardError.write(Data("SELFTEST beautify done\n".utf8))
         exit(0)
     }
 
@@ -560,6 +593,7 @@ enum CaptureSelfTest {
 
     static func runIfRequested(_ model: AppModel) async {
         annotateIfRequested()
+        beautifyIfRequested()
         editorIfRequested(model)
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--capture-selftest"), i + 1 < args.count else { return }
