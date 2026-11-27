@@ -575,6 +575,30 @@ enum CaptureSelfTest {
         exit(0)
     }
 
+    /// `--apps-selftest`: compares what the app picker would list with every .app sitting in the application folders.
+    static func appsIfRequested() {
+        guard CommandLine.arguments.contains("--apps-selftest") else { return }
+        let found = InstalledApps.scan()
+        let ids = Set(found.map(\.bundleID))
+        func say(_ s: String) { FileHandle.standardError.write(Data(("SELFTEST " + s + "\n").utf8)) }
+        say("apps found: \(found.count)")
+        let fm = FileManager.default
+        var missing: [String] = []
+        for dir in ["/Applications", "/Applications/Utilities"] {
+            for name in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where name.hasSuffix(".app") {
+                let url = URL(fileURLWithPath: dir + "/" + name)
+                guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { missing.append("\(name) (no bundle id)"); continue }
+                if !ids.contains(id) {
+                    let bg = (bundle.object(forInfoDictionaryKey: "LSBackgroundOnly") as? Bool) == true
+                    missing.append("\(name) (\(bg ? "background-only" : "MISSING"))")
+                }
+            }
+        }
+        say("not listed: \(missing)")
+        for probe in ["Windows App", "Runnock", "UURemote"] { say("\(probe): \(found.contains { $0.name == probe })") }
+        exit(0)
+    }
+
     /// `--beautify-selftest <dir>`: renders the presets and window frames from the sample screenshot.
     static func beautifyIfRequested() {
         let args = CommandLine.arguments
@@ -616,6 +640,7 @@ enum CaptureSelfTest {
     }
 
     static func runIfRequested(_ model: AppModel) async {
+        appsIfRequested()
         annotateIfRequested()
         beautifyIfRequested()
         editorIfRequested(model)

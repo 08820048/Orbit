@@ -154,18 +154,22 @@ struct InstalledApp: Identifiable, Hashable {
 }
 
 enum InstalledApps {
-    /// Scans the usual application folders (one level of subfolders deep). Background-only helpers are skipped.
-    static func scan() -> [InstalledApp] {
+    /// The folders apps are installed into, in the order they win when the same bundle id appears twice.
+    static var defaultRoots: [String] {
+        ["/Applications", "/System/Applications", "/System/Cryptexes/App/System/Applications", NSHomeDirectory() + "/Applications"]
+    }
+
+    /// Finds installed apps, looking up to `maxDepth` folders down (so "/Applications/Utilities/…" and vendor folders like
+    /// "/Applications/Setapp/…" are covered). Apps without a Dock icon (`LSUIElement`: menu bar tools, Windows App…) are
+    /// real apps people use and share, so they are included; only `LSBackgroundOnly` helpers are left out.
+    static func scan(roots: [String] = defaultRoots, maxDepth: Int = 3) -> [InstalledApp] {
         let fm = FileManager.default
-        let roots = ["/Applications", "/Applications/Utilities", "/System/Applications",
-                     "/System/Applications/Utilities", NSHomeDirectory() + "/Applications"]
         var seen = Set<String>()
         var out: [InstalledApp] = []
 
         func add(_ url: URL) {
             guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !seen.contains(id) else { return }
             if (bundle.object(forInfoDictionaryKey: "LSBackgroundOnly") as? Bool) == true { return }
-            if (bundle.object(forInfoDictionaryKey: "LSUIElement") as? Bool) == true { return }
             seen.insert(id)
             let name = (bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String)
                 ?? (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
@@ -176,13 +180,11 @@ enum InstalledApps {
         }
 
         for root in roots {
-            guard let items = try? fm.contentsOfDirectory(at: URL(fileURLWithPath: root), includingPropertiesForKeys: [.isDirectoryKey],
-                                                          options: [.skipsHiddenFiles]) else { continue }
-            for url in items {
-                if url.pathExtension == "app" { add(url); continue }
-                let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                guard isDir, let inner = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { continue }
-                for sub in inner where sub.pathExtension == "app" { add(sub) }
+            guard let walker = fm.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: [.isDirectoryKey],
+                                             options: [.skipsHiddenFiles, .skipsPackageDescendants], errorHandler: { _, _ in true }) else { continue }
+            while let url = walker.nextObject() as? URL {
+                if url.pathExtension == "app" { add(url); walker.skipDescendants(); continue }
+                if walker.level >= maxDepth { walker.skipDescendants() }
             }
         }
         return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
