@@ -1,12 +1,14 @@
 import AppKit
 import OrbitCore
 
-enum SelectionMode { case region, window }
+enum SelectionMode { case region, window, display }
 
 enum SelectionResult {
     /// The cropped pixels, ready to save.
     case region(CGImage, scale: Double, area: RegionArea)
     case window(CapturableWindow)
+    /// A whole display, picked in display mode.
+    case display(CGImage, scale: Double)
     case cancelled
 }
 
@@ -47,7 +49,14 @@ final class SelectionOverlay {
     /// Called when the mode changes, so the floating menu can follow.
     var onModeChange: ((SelectionMode) -> Void)?
 
-    func toggleMode() { setMode(mode == .region ? .window : .region) }
+    func toggleMode() {
+        guard mode != .display else { return }
+        setMode(mode == .region ? .window : .region)
+    }
+
+    /// The display under the pointer (display mode).
+    var hoveredScreen: Int? { frozen.firstIndex { $0.screen.frame.contains(mouse) } }
+    func displayName(_ index: Int) -> String { frozen[index].screen.localizedName }
 
     func setMode(_ new: SelectionMode) {
         guard new != mode else { return }
@@ -71,6 +80,9 @@ final class SelectionOverlay {
         case .window:
             updateHover()
             if let w = hovered { finish(.window(w)) }
+        case .display:
+            let f = frozen[screen]
+            finish(.display(f.image, scale: Double(f.scale)))
         }
         refresh()
     }
@@ -122,7 +134,12 @@ final class SelectionOverlay {
         hovered = windows.first { $0.frame.contains(mouse) }
     }
 
-    private func refresh() { for p in panels { p.contentView?.needsDisplay = true } }
+    private func refresh() {
+        for p in panels {
+            p.contentView?.needsDisplay = true
+            if let v = p.contentView { p.invalidateCursorRects(for: v) }
+        }
+    }
 }
 
 final class OverlayWindow: NSWindow {
@@ -163,7 +180,27 @@ final class OverlayView: NSView {
         addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: self, userInfo: nil))
     }
 
-    override func resetCursorRects() { addCursorRect(bounds, cursor: .crosshair) }
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: MainActor.assumeIsolated { overlay.mode } == .display ? Self.cameraCursor : .crosshair)
+    }
+
+    /// A camera in a dark disc: the pointer while choosing which display to capture.
+    private static let cameraCursor: NSCursor = {
+        let size = NSSize(width: 40, height: 40)
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor(srgbRed: 0.07, green: 0.09, blue: 0.16, alpha: 0.92).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            NSColor.white.withAlphaComponent(0.5).setStroke()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1.5, dy: 1.5)).stroke()
+            let cfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold).applying(.init(paletteColors: [.white]))
+            if let sym = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: nil)?.withSymbolConfiguration(cfg) {
+                let s = sym.size
+                sym.draw(in: NSRect(x: (rect.width - s.width) / 2, y: (rect.height - s.height) / 2, width: s.width, height: s.height))
+            }
+            return true
+        }
+        return NSCursor(image: image, hotSpot: NSPoint(x: 20, y: 20))
+    }()
 
     // MARK: Events
 
@@ -193,6 +230,8 @@ final class OverlayView: NSView {
         MainActor.assumeIsolated {
             ctx.draw(frozen.image, in: bounds)
 
+            if overlay.mode == .display { drawDisplayPicker(); return }
+
             let selection = overlay.selection().flatMap { overlay.drag?.screen == index ? $0 : nil }
             let windowRect = overlay.mode == .window ? overlay.windowFrame(onScreen: index) : nil
             let hole = selection ?? windowRect
@@ -209,6 +248,24 @@ final class OverlayView: NSView {
             else if overlay.mode == .region { drawCrosshair() }
             drawHint()
         }
+    }
+
+    private func drawDisplayPicker() {
+        let hovered = overlay.hoveredScreen == index
+        if !hovered {
+            Self.ink.setFill()
+            bounds.fill()
+        } else {
+            Self.blue.withAlphaComponent(0.12).setFill()
+            bounds.fill()
+            Self.blue.setStroke()
+            let border = NSBezierPath(rect: bounds.insetBy(dx: 2, dy: 2))
+            border.lineWidth = 4
+            border.stroke()
+            drawPill([(overlay.displayName(index), true), ("\(Int(frozen.image.width)) × \(Int(frozen.image.height))", false)],
+                     at: CGPoint(x: bounds.midX - 90, y: bounds.midY + 40), height: 30)
+        }
+        drawHint()
     }
 
     private func drawCrosshair() {
@@ -253,7 +310,12 @@ final class OverlayView: NSView {
     }
 
     private func drawHint() {
-        let parts: [(String, Bool)] = MainActor.assumeIsolated { overlay.mode } == .region
+        let mode = MainActor.assumeIsolated { overlay.mode }
+        if mode == .display {
+            drawPill([(String(localized: "点击选择要截取的显示器"), false), ("Esc", true), (String(localized: "取消"), false)], at: nil, height: 34)
+            return
+        }
+        let parts: [(String, Bool)] = mode == .region
             ? [(String(localized: "拖动选择区域"), false), (String(localized: "空格"), true), (String(localized: "切换为窗口"), false), ("⇧", true), (String(localized: "锁定比例"), false), ("Esc", true), (String(localized: "取消"), false)]
             : [(String(localized: "点击截取此窗口"), false), (String(localized: "空格"), true), (String(localized: "切换为区域"), false), ("Esc", true), (String(localized: "取消"), false)]
         drawPill(parts, at: nil, height: 34)

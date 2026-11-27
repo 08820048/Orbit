@@ -89,9 +89,12 @@ final class CaptureCoordinator: ObservableObject {
             switch action {
             case .fullscreen:
                 let screens = try await CaptureService.freezeScreens(includeCursor: settings.includeCursor)
-                let mouse = NSEvent.mouseLocation
-                let pick = screens.first { $0.screen.frame.contains(mouse) } ?? screens[0]
-                try finish(pick.image, kind: .fullscreen, source: source, scale: Double(pick.scale))
+                if screens.count == 1 {
+                    try finish(screens[0].image, kind: .fullscreen, source: source, scale: Double(screens[0].scale))
+                } else {
+                    // Several displays: the pointer turns into a camera and the user clicks the one to capture.
+                    present(SelectionOverlay(frozen: screens, windows: [], mode: .display) { [weak self] r in self?.overlayDone(r, source: source) }, menu: menu, current: .fullscreen)
+                }
             case .repeatLast:
                 guard let area = lastRegion else { notice(String(localized: "还没有可以重复的区域"), String(localized: "先用「区域截图」截一次，之后就能用这个快捷键重复同一块区域。")); return }
                 let screens = try await CaptureService.freezeScreens(includeCursor: settings.includeCursor)
@@ -105,28 +108,33 @@ final class CaptureCoordinator: ObservableObject {
                 async let frozen = CaptureService.freezeScreens(includeCursor: settings.includeCursor)
                 async let windows = CaptureService.windows()
                 let (f, w) = try await (frozen, windows)
-                let o = SelectionOverlay(frozen: f, windows: w, mode: action == .window ? .window : .region) { [weak self] result in
-                    guard let self else { return }
-                    self.overlay = nil
-                    self.toolbar.hide()
-                    if let next = self.switchingTo {
-                        // Picked fullscreen or delayed in the menu: carry on with that instead (still "running").
-                        self.switchingTo = nil
-                        Task {
-                            try? await Task.sleep(nanoseconds: 200_000_000)
-                            await self.run(next, fromUI: false, delay: self.settings.delaySeconds)
-                        }
-                        return
-                    }
-                    self.handle(result, source: source)
-                }
-                overlay = o
-                o.show()
-                if menu { showMenu(over: o, current: action == .window ? .window : .region) }
+                present(SelectionOverlay(frozen: f, windows: w, mode: action == .window ? .window : .region) { [weak self] r in self?.overlayDone(r, source: source) },
+                        menu: menu, current: action == .window ? .window : .region)
             }
         } catch {
             fail(error)
         }
+    }
+
+    private func present(_ o: SelectionOverlay, menu: Bool, current: CaptureAction) {
+        overlay = o
+        o.show()
+        if menu { showMenu(over: o, current: current) }
+    }
+
+    private func overlayDone(_ result: SelectionResult, source: String?) {
+        overlay = nil
+        toolbar.hide()
+        if let next = switchingTo {
+            // Picked "delayed" in the menu: carry on with that instead (still "running").
+            switchingTo = nil
+            Task {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                await run(next, fromUI: false, delay: settings.delaySeconds)
+            }
+            return
+        }
+        handle(result, source: source)
     }
 
     /// The window's capture button: starts a region capture and shows the floating menu to switch kind or close.
@@ -139,10 +147,11 @@ final class CaptureCoordinator: ObservableObject {
             case nil: o.cancel()
             case .region?: o.setMode(.region)
             case .window?: o.setMode(.window)
+            case .fullscreen?: o.setMode(.display)
             case let next?: self.switchingTo = next; o.cancel()
             }
         }
-        o.onModeChange = { [weak self] m in self?.toolbar.model.current = m == .window ? .window : .region }
+        o.onModeChange = { [weak self] m in self?.toolbar.model.current = m == .window ? .window : m == .display ? .fullscreen : .region }
         toolbar.show(current: current)
     }
 
@@ -163,6 +172,9 @@ final class CaptureCoordinator: ObservableObject {
             lastRegion = area
             if let data = try? JSONEncoder().encode(area) { UserDefaults.standard.set(data, forKey: "orbit.shot.lastRegion") }
             do { try finish(image, kind: .region, source: source, scale: scale) } catch { fail(error) }
+        case let .display(image, scale):
+            running = false
+            do { try finish(image, kind: .fullscreen, source: source, scale: scale) } catch { fail(error) }
         case let .window(window):
             Task {
                 defer { running = false }
