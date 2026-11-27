@@ -110,6 +110,8 @@ struct CustomShareDoc: Codable, Equatable {
     var hashtags = "#我的Mac软件 #Mac"
     /// Lay the card out as "icon + name + one-line note" and show `notes`.
     var showNotes = false
+    /// Apps the user added from outside the usual folders, by path (they would not be found by scanning).
+    var extraApps: [String] = []
     /// One-line comments by app key (bundle id or custom-app key). Kept even if the app leaves every group.
     var notes: [String: String] = [:]
 
@@ -138,6 +140,7 @@ struct CustomShareDoc: Codable, Equatable {
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
         usageTitle = try c.decodeIfPresent(String.self, forKey: .usageTitle) ?? d.usageTitle
         hashtags = try c.decodeIfPresent(String.self, forKey: .hashtags) ?? d.hashtags
+        extraApps = try c.decodeIfPresent([String].self, forKey: .extraApps) ?? d.extraApps
         showNotes = try c.decodeIfPresent(Bool.self, forKey: .showNotes) ?? d.showNotes
         notes = try c.decodeIfPresent([String: String].self, forKey: .notes) ?? d.notes
     }
@@ -162,21 +165,15 @@ enum InstalledApps {
     /// Finds installed apps, looking up to `maxDepth` folders down (so "/Applications/Utilities/…" and vendor folders like
     /// "/Applications/Setapp/…" are covered). Apps without a Dock icon (`LSUIElement`: menu bar tools, Windows App…) are
     /// real apps people use and share, so they are included; only `LSBackgroundOnly` helpers are left out.
-    static func scan(roots: [String] = defaultRoots, maxDepth: Int = 3) -> [InstalledApp] {
+    static func scan(roots: [String] = defaultRoots, maxDepth: Int = 3, extraPaths: [String] = []) -> [InstalledApp] {
         let fm = FileManager.default
         var seen = Set<String>()
         var out: [InstalledApp] = []
 
         func add(_ url: URL) {
-            guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !seen.contains(id) else { return }
-            if (bundle.object(forInfoDictionaryKey: "LSBackgroundOnly") as? Bool) == true { return }
-            seen.insert(id)
-            let name = (bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String)
-                ?? (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
-                ?? fm.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-            let category = ((bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String) ?? "")
-                .replacingOccurrences(of: "public.app-category.", with: "").lowercased()
-            out.append(InstalledApp(bundleID: id, name: name, category: category))
+            guard let app = app(at: url), !seen.contains(app.bundleID) else { return }
+            seen.insert(app.bundleID)
+            out.append(app)
         }
 
         for root in roots {
@@ -187,7 +184,22 @@ enum InstalledApps {
                 if walker.level >= maxDepth { walker.skipDescendants() }
             }
         }
+        for path in extraPaths where fm.fileExists(atPath: path) { add(URL(fileURLWithPath: path)) }
         return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// One app bundle as the picker lists it, or nil for background-only helpers and things that are not apps.
+    /// An app without a bundle identifier gets a path-based key instead of being dropped.
+    static func app(at url: URL) -> InstalledApp? {
+        guard url.pathExtension == "app", let bundle = Bundle(url: url) else { return nil }
+        if (bundle.object(forInfoDictionaryKey: "LSBackgroundOnly") as? Bool) == true { return nil }
+        let id = bundle.bundleIdentifier ?? AppCatalog.pathKey(url)
+        let name = (bundle.localizedInfoDictionary?["CFBundleDisplayName"] as? String)
+            ?? (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+        let category = ((bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String) ?? "")
+            .replacingOccurrences(of: "public.app-category.", with: "").lowercased()
+        return InstalledApp(bundleID: id, name: name, category: category)
     }
 }
 
@@ -287,7 +299,8 @@ final class CustomShareModel: ObservableObject {
     func loadInstalledIfNeeded() async {
         guard !scanned else { return }
         scanned = true
-        installed = await Task.detached(priority: .userInitiated) { InstalledApps.scan() }.value
+        let extra = doc.extraApps
+        installed = await Task.detached(priority: .userInitiated) { InstalledApps.scan(extraPaths: extra) }.value
         detectedTools = await Task.detached(priority: .userInitiated) { TerminalCatalog.detect() }.value
     }
 
@@ -306,6 +319,23 @@ final class CustomShareModel: ObservableObject {
     var totalApps: Int { doc.groups.reduce(0) { $0 + $1.bundleIDs.count } }
 
     // MARK: Groups
+
+    /// Adds apps picked from anywhere on disk to the list and to `group`. Returns how many were not on the list before.
+    @discardableResult
+    func addExternalApps(_ urls: [URL], to group: UUID?) -> Int {
+        var added = 0
+        for url in urls {
+            guard let app = InstalledApps.app(at: url) else { continue }
+            if !installed.contains(where: { $0.bundleID == app.bundleID }) {
+                installed.append(app)
+                installed.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                added += 1
+            }
+            if !doc.extraApps.contains(url.path) { doc.extraApps.append(url.path) }
+            if let group, !(doc.groups.first { $0.id == group }?.bundleIDs.contains(app.bundleID) ?? false) { toggle(app.bundleID, in: group) }
+        }
+        return added
+    }
 
     func addGroup() {
         let group = ShareGroup(name: "分组 \(doc.groups.count + 1)")

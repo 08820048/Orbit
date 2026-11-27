@@ -23,11 +23,25 @@ public final class AppCatalog {
         cache.removeAll()
     }
 
+    /// Apps that have no bundle identifier (some game launchers…) are identified by where they are: "path:/Applications/X.app".
+    public nonisolated static let pathKeyPrefix = "path:"
+
+    public nonisolated static func pathKey(_ url: URL) -> String { pathKeyPrefix + url.path }
+
     public func info(for bundleID: String) -> Info {
         if let hit = cache[bundleID] { return hit }
         let ws = NSWorkspace.shared
         let info: Info
-        if let url = ws.urlForApplication(withBundleIdentifier: bundleID) {
+        if bundleID.hasPrefix(Self.pathKeyPrefix) {
+            let path = String(bundleID.dropFirst(Self.pathKeyPrefix.count))
+            if FileManager.default.fileExists(atPath: path) {
+                let name = FileManager.default.displayName(atPath: path).replacingOccurrences(of: ".app", with: "")
+                info = Info(bundleID: bundleID, name: overrides[bundleID] ?? name, icon: Self.normalized(ws.icon(forFile: path)), isInstalled: true)
+            } else {
+                let name = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+                info = Info(bundleID: bundleID, name: overrides[bundleID] ?? name, icon: Self.normalized(ws.icon(for: .application)), isInstalled: false)
+            }
+        } else if let url = ws.urlForApplication(withBundleIdentifier: bundleID) {
             let bundle = Bundle(url: url)
             // Finder's localized name first ("微信", not "WeChat"), then the bundle's own display name.
             let finderName = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")

@@ -558,3 +558,15 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(b == "Orbit 2026-11-26 21.03.12 已美化 (2).png")
     }
 }
+
+@Suite @MainActor struct PathKeyTests {
+    @Test func appsWithoutABundleIDAreIdentifiedByPath() {
+        let catalog = AppCatalog()
+        let key = AppCatalog.pathKey(URL(fileURLWithPath: "/System/Applications/Calculator.app"))
+        #expect(key == "path:/System/Applications/Calculator.app")
+        let known = catalog.info(for: key)
+        #expect(known.isInstalled && !known.name.isEmpty && known.bundleID == key)
+        let gone = catalog.info(for: "path:/Applications/DefinitelyNotInstalled-xyz.app")
+        #expect(!gone.isInstalled && gone.name == "DefinitelyNotInstalled-xyz")
+    }
+}

@@ -676,6 +676,8 @@ struct AppPickerSheet: View {
                 .padding(.horizontal, 12).frame(height: 34)
                 .background(Theme.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 GlassSegmented(options: [0, 1, 2], label: { ["全部 \(custom.installed.count + custom.doc.customApps.count)", "最近常用", "已选"][$0] }, selection: $filter)
+                Button("从其他位置添加…") { addFromElsewhere() }.glassButton()
+                    .help("软件不在「应用程序」文件夹里（比如外置硬盘、下载目录）时，直接选择它")
             }
             .padding(.top, 18)
 
@@ -730,6 +732,19 @@ struct AppPickerSheet: View {
         .sheet(item: $editing) { app in
             CustomAppSheet(custom: custom, draft: app, isNew: editingIsNew)
         }
+    }
+
+    /// Lets the user pick .app bundles from anywhere; they are remembered and added to the current group.
+    private func addFromElsewhere() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = "添加"
+        panel.message = "选择想加进来的软件"
+        guard panel.runModal() == .OK else { return }
+        custom.addExternalApps(panel.urls, to: custom.activeGroup)
     }
 
     private var visibleTools: [TerminalTool] {

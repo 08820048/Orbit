@@ -587,7 +587,8 @@ enum CaptureSelfTest {
         for dir in ["/Applications", "/Applications/Utilities"] {
             for name in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where name.hasSuffix(".app") {
                 let url = URL(fileURLWithPath: dir + "/" + name)
-                guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { missing.append("\(name) (no bundle id)"); continue }
+                guard let bundle = Bundle(url: url) else { continue }
+                let id = bundle.bundleIdentifier ?? AppCatalog.pathKey(url)
                 if !ids.contains(id) {
                     let bg = (bundle.object(forInfoDictionaryKey: "LSBackgroundOnly") as? Bool) == true
                     missing.append("\(name) (\(bg ? "background-only" : "MISSING"))")
