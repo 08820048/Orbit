@@ -517,6 +517,13 @@ enum CaptureSelfTest {
         plain.textSize = AnnotationRenderer.measureText("无底色文字 + 阴影", fontSize: plain.fontSize, background: false)
         items.append(plain)
 
+        var hl = Annotation(shape: .highlight(CGRect(x: 622, y: 616, width: 190, height: 40))); hl.color = AnnotationColor.highlighters[0]; hl.shadow = false
+        items.append(hl)
+        for (i, pos) in [CGPoint(x: 560, y: 300), CGPoint(x: 560, y: 470), CGPoint(x: 560, y: 640)].enumerated() {
+            var m = Annotation(shape: .marker(center: pos)); m.fontSize = AnnotationScale.fontSize(.medium, imageWidth: w)
+            m.color = [AnnotationColor.red, .blue, .green][i]; m.markerNumber = i + 1
+            items.append(m)
+        }
         return (base, items)
     }
 

@@ -109,7 +109,7 @@ struct EditorView: View {
 
     // MARK: Properties of the current tool (or of the selected annotation)
 
-    private enum PropertyKind { case stroke, text, blur, crop, hint }
+    private enum PropertyKind { case stroke, text, blur, crop, marker, highlight, hint }
 
     private var propertyKind: PropertyKind {
         if model.tool == .crop { return .crop }
@@ -117,11 +117,15 @@ struct EditorView: View {
         switch model.tool {
         case .text: return .text
         case .blur: return .blur
+        case .marker: return .marker
+        case .highlight: return .highlight
         case .arrow, .rectangle, .ellipse, .line: return .stroke
         case .select:
             switch shape {
             case .text: return .text
             case .blur: return .blur
+            case .marker: return .marker
+            case .highlight: return .highlight
             case .some: return .stroke
             case .none: return .hint
             }
@@ -150,6 +154,32 @@ struct EditorView: View {
                     model.restyleSelected { $0.fontSize = AnnotationScale.fontSize(level, imageWidth: model.imageSize.width) }
                 } }
                 labeled("底色") { GlassToggle(isOn: Binding(get: { model.textBackground }, set: { v in model.textBackground = v; model.restyleSelected { $0.textBackground = v } })) }
+            case .marker:
+                colorSwatches
+                labeled("大小") { levelPicker(TextLevel.allCases, selection: model.textLevel, content: { level in
+                    Image(systemName: "circle.fill").font(.system(size: [8, 11, 15][level.rawValue - 1]))
+                }) { level in
+                    model.textLevel = level
+                    model.restyleSelected { $0.fontSize = AnnotationScale.fontSize(level, imageWidth: model.imageSize.width) }
+                } }
+                labeled("阴影") { GlassToggle(isOn: Binding(get: { model.shadow }, set: { v in model.shadow = v; model.restyleSelected { $0.shadow = v } })) }
+                Text("每点一下加一个，删除后会自动重新编号").font(.system(size: 12)).foregroundStyle(Theme.text2)
+            case .highlight:
+                labeled("颜色") {
+                    HStack(spacing: 10) {
+                        ForEach(Array(AnnotationColor.highlighters.enumerated()), id: \.offset) { _, c in
+                            let on = model.highlightColor == c
+                            Circle().fill(Color(.sRGB, red: c.r, green: c.g, blue: c.b))
+                                .frame(width: 20, height: 20)
+                                .overlay(Circle().strokeBorder(.white.opacity(0.28), lineWidth: 1))
+                                .padding(3)
+                                .overlay(Circle().strokeBorder(on ? Color.white : .clear, lineWidth: 2))
+                                .contentShape(Circle())
+                                .onTapGesture { model.highlightColor = c; model.restyleSelected { $0.color = c } }
+                        }
+                    }
+                }
+                Text("拖一个矩形盖在文字上，半透明，文字依然看得清").font(.system(size: 12)).foregroundStyle(Theme.text2)
             case .blur:
                 labeled("样式") {
                     GlassSegmented(options: BlurMode.allCases, label: \.label,

@@ -142,7 +142,7 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
     private func drawHandles(for a: Annotation, _ ctx: CGContext) {
         // Dashed frame for rectangles and text, so selection is visible even on thin shapes.
         switch a.shape {
-        case .rectangle, .ellipse, .blur, .text:
+        case .rectangle, .ellipse, .blur, .text, .highlight, .marker:
             ctx.saveGState()
             ctx.setStrokeColor(CGColor(srgbRed: 0.36, green: 0.62, blue: 1, alpha: 0.9))
             ctx.setLineWidth(1)
@@ -246,7 +246,10 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
                 model.select(a.id)
                 beginEditing(a.id, isNew: true)
             }
-        case .arrow, .line, .rectangle, .ellipse, .blur:
+        case .marker:
+            // One click, one numbered circle.
+            model.add(model.makeAnnotation(.marker(center: p)))
+        case .arrow, .line, .rectangle, .ellipse, .blur, .highlight:
             let shape = Self.initialShape(for: model.tool, at: p)
             draft = model.makeAnnotation(shape)
             drag = .creating(start: p)
@@ -261,6 +264,7 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
         case .line: .line(from: p, to: p)
         case .rectangle: .rectangle(CGRect(origin: p, size: .zero))
         case .ellipse: .ellipse(CGRect(origin: p, size: .zero))
+        case .highlight: .highlight(CGRect(origin: p, size: .zero))
         default: .blur(CGRect(origin: p, size: .zero))
         }
     }
@@ -276,6 +280,7 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
             case .line: d.shape = .line(from: start, to: GeometryTools.endpoint(from: start, to: p, snap: shift))
             case .rectangle: d.shape = .rectangle(GeometryTools.rect(from: start, to: p, square: shift))
             case .ellipse: d.shape = .ellipse(GeometryTools.rect(from: start, to: p, square: shift))
+            case .highlight: d.shape = .highlight(GeometryTools.rect(from: start, to: p, square: false).intersection(model.fullRect))
             case .blur: d.shape = .blur(GeometryTools.rect(from: start, to: p, square: false).intersection(model.fullRect))
             default: break
             }
@@ -312,7 +317,7 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
     private static func isBigEnough(_ a: Annotation) -> Bool {
         switch a.shape {
         case let .arrow(p, q), let .line(p, q): return hypot(q.x - p.x, q.y - p.y) >= 8
-        case let .rectangle(r), let .ellipse(r), let .blur(r): return r.width >= 6 && r.height >= 6
+        case let .rectangle(r), let .ellipse(r), let .blur(r), let .highlight(r): return r.width >= 6 && r.height >= 6
         default: return true
         }
     }

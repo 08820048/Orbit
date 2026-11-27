@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class EditorModel: ObservableObject {
     enum Tool: String, CaseIterable, Identifiable {
-        case select, arrow, rectangle, ellipse, line, text, blur, crop
+        case select, arrow, rectangle, ellipse, line, text, marker, highlight, blur, crop
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -16,6 +16,8 @@ final class EditorModel: ObservableObject {
             case .ellipse: "椭圆"
             case .line: "直线"
             case .text: "文字"
+            case .marker: "序号"
+            case .highlight: "荧光笔"
             case .blur: "模糊 / 马赛克"
             case .crop: "裁剪"
             }
@@ -28,6 +30,8 @@ final class EditorModel: ObservableObject {
             case .ellipse: "oval"
             case .line: "line.diagonal"
             case .text: "textformat"
+            case .marker: "1.circle"
+            case .highlight: "highlighter"
             case .blur: "squareshape.split.2x2"
             case .crop: "crop"
             }
@@ -40,6 +44,8 @@ final class EditorModel: ObservableObject {
             case .ellipse: "o"
             case .line: "l"
             case .text: "t"
+            case .marker: "n"
+            case .highlight: "h"
             case .blur: "b"
             case .crop: "c"
             }
@@ -83,6 +89,7 @@ final class EditorModel: ObservableObject {
     @Published var lineLevel: LineLevel = .medium
     @Published var shadow = true
     @Published var textLevel: TextLevel = .medium
+    @Published var highlightColor: AnnotationColor = AnnotationColor.highlighters[0]
     @Published var textBackground = true
     @Published var blurMode: BlurMode = .pixelate
     @Published var blurStrength = 2
@@ -174,13 +181,13 @@ final class EditorModel: ObservableObject {
     func commitLive() {
         guard let live = liveItems else { return }
         liveItems = nil
-        history.commit(EditSnapshot(items: live, crop: history.current.crop))
+        history.commit(EditSnapshot(items: Annotation.renumbered(live), crop: history.current.crop))
         objectWillChange.send()
     }
 
     func commit(items: [Annotation]) {
         liveItems = nil
-        history.commit(EditSnapshot(items: items, crop: history.current.crop))
+        history.commit(EditSnapshot(items: Annotation.renumbered(items), crop: history.current.crop))
     }
 
     func add(_ a: Annotation) {
@@ -227,6 +234,11 @@ final class EditorModel: ObservableObject {
                                                   < abs(AnnotationScale.fontSize($1, imageWidth: imageSize.width) - a.fontSize) } ?? .medium
         case .blur:
             blurMode = a.blurMode; blurStrength = a.blurStrength
+        case .highlight:
+            highlightColor = a.color
+        case .marker:
+            textLevel = TextLevel.allCases.min { abs(AnnotationScale.fontSize($0, imageWidth: imageSize.width) - a.fontSize)
+                                                  < abs(AnnotationScale.fontSize($1, imageWidth: imageSize.width) - a.fontSize) } ?? .medium
         default:
             lineLevel = LineLevel.allCases.min { abs(AnnotationScale.lineWidth($0, imageWidth: imageSize.width) - a.lineWidth)
                                                  < abs(AnnotationScale.lineWidth($1, imageWidth: imageSize.width) - a.lineWidth) } ?? .medium
@@ -244,6 +256,15 @@ final class EditorModel: ObservableObject {
         a.blurMode = blurMode
         a.blurStrength = blurStrength
         if case let .text(_, s) = shape { a.textSize = AnnotationRenderer.measureText(s, fontSize: a.fontSize, background: a.textBackground) }
+        switch shape {
+        case .highlight:
+            a.color = highlightColor
+            a.shadow = false
+        case .marker:
+            a.markerNumber = items.filter { if case .marker = $0.shape { return true }; return false }.count + 1
+        default:
+            break
+        }
         return a
     }
 

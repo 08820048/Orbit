@@ -570,3 +570,40 @@ private func session(_ id: String, _ start: String, _ end: String, _ source: Usa
         #expect(!gone.isInstalled && gone.name == "DefinitelyNotInstalled-xyz")
     }
 }
+
+@Suite struct MarkerAndHighlightTests {
+    private func marker(_ x: Double, _ y: Double) -> Annotation {
+        var a = Annotation(shape: .marker(center: CGPoint(x: x, y: y))); a.fontSize = 30; return a
+    }
+
+    @Test func markersAreNumberedInOrderAndCloseGapsWhenOneIsRemoved() {
+        let a = marker(10, 10), b = marker(50, 10), c = marker(90, 10)
+        let box = Annotation(shape: .rectangle(CGRect(x: 0, y: 0, width: 5, height: 5)))
+        var list = Annotation.renumbered([a, box, b, c])
+        #expect(list.filter { if case .marker = $0.shape { return true }; return false }.map(\.markerNumber) == [1, 2, 3])
+        list.removeAll { $0.id == b.id }
+        let after = Annotation.renumbered(list)
+        #expect(after.filter { if case .marker = $0.shape { return true }; return false }.map(\.markerNumber) == [1, 2])
+        #expect(after.first { $0.id == c.id }?.markerNumber == 2)      // the third became the second
+    }
+
+    @Test func markerIsAHitTargetAroundItsCircleAndMoves() {
+        let m = marker(100, 100)
+        #expect(m.markerRadius == 30 * 0.62)
+        #expect(m.hit(CGPoint(x: 100, y: 100), tolerance: 4))
+        #expect(m.hit(CGPoint(x: 100 + m.markerRadius + 2, y: 100), tolerance: 4))
+        #expect(!m.hit(CGPoint(x: 150, y: 100), tolerance: 4))
+        #expect(m.bounds.midX == 100 && m.bounds.width == m.markerRadius * 2)
+        #expect(m.moved(by: CGVector(dx: 5, dy: -5)).shape == .marker(center: CGPoint(x: 105, y: 95)))
+        #expect(m.handles.isEmpty)
+    }
+
+    @Test func highlightBehavesLikeAResizableRegion() {
+        let h = Annotation(shape: .highlight(CGRect(x: 10, y: 10, width: 100, height: 20)))
+        #expect(h.hit(CGPoint(x: 60, y: 20), tolerance: 4))              // anywhere inside
+        #expect(h.handles.count == 8)
+        let grown = h.resized(.right, to: CGPoint(x: 200, y: 0), constrain: false)
+        #expect(grown.shape == .highlight(CGRect(x: 10, y: 10, width: 190, height: 20)))
+        #expect(AnnotationColor.highlighters.count == 4)
+    }
+}

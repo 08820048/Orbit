@@ -46,7 +46,7 @@ enum AnnotationRenderer {
         ctx.setFillColor(color)
         ctx.setLineWidth(a.lineWidth)
 
-        let useShadow = a.shadow && !isBlur(a)
+        let useShadow = a.shadow && !isBlur(a) && !isHighlight(a)
         if useShadow {
             ctx.setShadow(offset: CGSize(width: 0, height: -a.lineWidth * 0.45), blur: a.lineWidth * 1.3,
                           color: CGColor(gray: 0, alpha: 0.45))
@@ -63,6 +63,13 @@ enum AnnotationRenderer {
             ctx.strokeEllipse(in: r)
         case let .text(origin, string):
             drawText(string, origin: origin, a, ctx)
+        case let .highlight(r):
+            // Translucent, so the text underneath stays readable on light and dark pictures alike.
+            ctx.setFillColor(cgColor(a.color).copy(alpha: 0.42) ?? color)
+            ctx.addPath(CGPath(roundedRect: r, cornerWidth: min(4, r.height / 2), cornerHeight: min(4, r.height / 2), transform: nil))
+            ctx.fillPath()
+        case let .marker(center):
+            drawMarker(center, a, ctx)
         case .blur:
             break
         }
@@ -70,6 +77,28 @@ enum AnnotationRenderer {
     }
 
     private static func isBlur(_ a: Annotation) -> Bool { if case .blur = a.shape { return true }; return false }
+    private static func isHighlight(_ a: Annotation) -> Bool { if case .highlight = a.shape { return true }; return false }
+
+    /// A filled circle with a white ring and the number in the middle.
+    private static func drawMarker(_ center: CGPoint, _ a: Annotation, _ ctx: CGContext) {
+        let r = a.markerRadius
+        let circle = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+        ctx.setFillColor(cgColor(a.color))
+        ctx.fillEllipse(in: circle)
+        ctx.setStrokeColor(CGColor(gray: a.color.luminance > 0.7 ? 0.1 : 1, alpha: 0.9))
+        ctx.setLineWidth(max(1.5, r * 0.12))
+        ctx.strokeEllipse(in: circle.insetBy(dx: r * 0.08, dy: r * 0.08))
+        let text = "\(a.markerNumber)" as NSString
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: r * (a.markerNumber > 9 ? 0.95 : 1.15), weight: .bold),
+            .foregroundColor: a.color.luminance > 0.7 ? NSColor(white: 0.08, alpha: 1) : NSColor.white,
+        ]
+        let size = text.size(withAttributes: attrs)
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
+        text.draw(at: CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2), withAttributes: attrs)
+        NSGraphicsContext.current = previous
+    }
 
     private static func drawArrow(_ from: CGPoint, _ to: CGPoint, width: Double, _ ctx: CGContext) {
         let angle = atan2(to.y - from.y, to.x - from.x)

@@ -17,6 +17,9 @@ public struct AnnotationColor: Equatable, Sendable {
     public static let white = AnnotationColor(1, 1, 1)
     public static let black = AnnotationColor(0.07, 0.07, 0.07)
     public static let palette: [AnnotationColor] = [.red, .orange, .green, .blue, .purple, .white, .black]
+    /// Highlighter colours: bright and meant to be drawn translucent.
+    public static let highlighters: [AnnotationColor] = [AnnotationColor(1.0, 0.88, 0.29), AnnotationColor(0.36, 0.89, 0.49),
+                                                          AnnotationColor(1.0, 0.49, 0.71), AnnotationColor(0.43, 0.76, 1.0)]
 
     /// Perceived brightness 0...1, to pick readable text on top of this colour.
     public var luminance: Double { 0.299 * r + 0.587 * g + 0.114 * b }
@@ -31,6 +34,10 @@ public enum AnnotationShape: Equatable, Sendable {
     case text(origin: CGPoint, string: String)
     /// A region whose pixels are hidden for good when the image is exported.
     case blur(CGRect)
+    /// A numbered circle (1, 2, 3…) centred on `center`; the number is `Annotation.markerNumber`.
+    case marker(center: CGPoint)
+    /// A translucent rectangle laid over text, like a highlighter pen.
+    case highlight(CGRect)
 }
 
 public enum BlurMode: String, Equatable, Sendable, CaseIterable {
@@ -56,6 +63,8 @@ public struct Annotation: Identifiable, Equatable, Sendable {
     /// Blur regions only.
     public var blurMode: BlurMode = .pixelate
     public var blurStrength: Int = 2
+    /// Marker only. Kept in order by `Annotation.renumbered`.
+    public var markerNumber: Int = 1
 
     public init(shape: AnnotationShape) { self.shape = shape }
 }
@@ -87,12 +96,18 @@ extension Annotation {
             return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y)).insetBy(dx: -pad, dy: -pad)
         case let .rectangle(r), let .ellipse(r):
             return r.insetBy(dx: -pad, dy: -pad)
-        case let .blur(r):
+        case let .blur(r), let .highlight(r):
             return r
         case let .text(origin, _):
             return CGRect(origin: origin, size: textSize)
+        case let .marker(c):
+            let r = markerRadius
+            return CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
         }
     }
+
+    /// Radius of a marker circle in pixels, from its text size.
+    public var markerRadius: Double { fontSize * 0.62 }
 
     private var shapePadding: Double {
         if case .arrow = shape { return max(lineWidth * 2.5, lineWidth / 2 + 4) }
@@ -110,10 +125,12 @@ extension Annotation {
             return outer.contains(p) && (inner.width <= 0 || inner.height <= 0 || !inner.contains(p))
         case let .ellipse(r):
             return Self.ellipseEdgeDistance(p, r) <= reach
-        case let .blur(r):
+        case let .blur(r), let .highlight(r):
             return r.insetBy(dx: -tolerance, dy: -tolerance).contains(p)
         case .text:
             return bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(p)
+        case let .marker(c):
+            return hypot(p.x - c.x, p.y - c.y) <= markerRadius + tolerance
         }
     }
 
@@ -126,6 +143,8 @@ extension Annotation {
         case let .rectangle(r): a.shape = .rectangle(r.offsetBy(dx: d.dx, dy: d.dy))
         case let .ellipse(r): a.shape = .ellipse(r.offsetBy(dx: d.dx, dy: d.dy))
         case let .blur(r): a.shape = .blur(r.offsetBy(dx: d.dx, dy: d.dy))
+        case let .highlight(r): a.shape = .highlight(r.offsetBy(dx: d.dx, dy: d.dy))
+        case let .marker(c): a.shape = .marker(center: m(c))
         case let .text(o, s): a.shape = .text(origin: m(o), string: s)
         }
         return a
@@ -135,8 +154,8 @@ extension Annotation {
     public var handles: [(handle: Handle, point: CGPoint)] {
         switch shape {
         case let .arrow(a, b), let .line(a, b): return [(.start, a), (.end, b)]
-        case let .rectangle(r), let .ellipse(r), let .blur(r): return RectGeometry.handles(of: r)
-        case .text: return []
+        case let .rectangle(r), let .ellipse(r), let .blur(r), let .highlight(r): return RectGeometry.handles(of: r)
+        case .text, .marker: return []
         }
     }
 
@@ -153,7 +172,8 @@ extension Annotation {
         case let .rectangle(r): a.shape = .rectangle(RectGeometry.resize(r, handle: handle, to: point, square: constrain))
         case let .ellipse(r): a.shape = .ellipse(RectGeometry.resize(r, handle: handle, to: point, square: constrain))
         case let .blur(r): a.shape = .blur(RectGeometry.resize(r, handle: handle, to: point, square: constrain))
-        case .text: break
+        case let .highlight(r): a.shape = .highlight(RectGeometry.resize(r, handle: handle, to: point, square: constrain))
+        case .text, .marker: break
         }
         return a
     }
@@ -174,6 +194,20 @@ extension Annotation {
         let d = hypot(nx, ny)
         guard d > 0 else { return min(rx, ry) }
         return abs(d - 1) * min(rx, ry)
+    }
+}
+
+extension Annotation {
+    /// The same list with markers numbered 1, 2, 3… in the order they were added, so deleting one closes the gap.
+    public static func renumbered(_ items: [Annotation]) -> [Annotation] {
+        var n = 0
+        return items.map { a in
+            guard case .marker = a.shape else { return a }
+            n += 1
+            var b = a
+            b.markerNumber = n
+            return b
+        }
     }
 }
 
