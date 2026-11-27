@@ -92,9 +92,8 @@ private struct ScreenshotsContent: View {
     private var library: some View {
         OScroll {
             VStack(alignment: .leading, spacing: 0) {
-                header
+                toolbarRow
                 if capture.needsPermission { permissionBanner.padding(.top, 18) }
-                filterRow.padding(.top, 24)
                 if records.isEmpty { empty.padding(.top, 60) } else { groups }
             }
             .padding(.horizontal, 56).padding(.top, 22).padding(.bottom, 40)
@@ -102,35 +101,25 @@ private struct ScreenshotsContent: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("截图").font(.system(size: 38, weight: .bold))
-                Text("\(total) 张 · \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)) · \(Self.shortPath(settings.folderPath))")
-                    .font(.system(size: 12)).foregroundStyle(Theme.text2)
-            }
-            Spacer()
-            HStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                    TextField("搜索文件名、应用", text: $search).textFieldStyle(.plain).font(.system(size: 12))
-                }
-                .padding(.horizontal, 10).frame(width: 220, height: 30)
-                .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                Button("在 Finder 中显示") { NSWorkspace.shared.open(settings.folderURL) }.glassButton()
-                Button { capture.startFromMenu() } label: {
-                    Image(systemName: "camera.viewfinder").font(.system(size: 15, weight: .semibold)).frame(width: 22, height: 18)
-                }
-                .glassButton(primary: true).help(Text("截图"))
-            }
-            .padding(.bottom, 4).fixedSize()
-        }
-    }
-
-    private var filterRow: some View {
-        HStack(spacing: 12) {
+    /// One row at the top: filter and totals on the left, search, Finder and the capture button on the right.
+    private var toolbarRow: some View {
+        HStack(spacing: 14) {
             GlassSegmented(options: [CaptureKind?.none, .region, .window, .fullscreen], label: { $0?.label ?? String(localized: "全部") }, selection: $kind)
-            Spacer()
+            Text("\(total) 张 · \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))")
+                .font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
+            Spacer(minLength: 12)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                TextField("搜索文件名、应用", text: $search).textFieldStyle(.plain).font(.system(size: 12))
+            }
+            .padding(.horizontal, 10).frame(width: 220, height: 30)
+            .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Button("在 Finder 中显示") { NSWorkspace.shared.open(settings.folderURL) }
+                .glassButton().help(Text(verbatim: Self.shortPath(settings.folderPath)))
+            Button { capture.startFromMenu() } label: {
+                Image(systemName: "camera.viewfinder").font(.system(size: 15, weight: .semibold)).frame(width: 22, height: 18)
+            }
+            .glassButton(primary: true).help(Text("截图"))
         }
     }
 
