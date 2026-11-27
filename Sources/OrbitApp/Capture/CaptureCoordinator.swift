@@ -28,6 +28,9 @@ final class CaptureCoordinator: ObservableObject {
     /// Orbit hid itself to stay out of the picture; it comes back once the shot is saved or cancelled.
     private var hiddenForCapture = false
     private let quick = QuickAccessController()
+    private let toolbar = CaptureToolbarController()
+    /// Set while the floating menu swaps the running selection for another capture kind.
+    private var switchingTo: CaptureAction?
     private var hotKeyIDs: [CaptureAction: UInt32] = [:]
     private var bag = Set<AnyCancellable>()
 
@@ -57,7 +60,7 @@ final class CaptureCoordinator: ObservableObject {
 
     // MARK: Taking a screenshot
 
-    func perform(_ action: CaptureAction, fromUI: Bool = false, delay: Int? = nil) {
+    func perform(_ action: CaptureAction, fromUI: Bool = false, delay: Int? = nil, menu: Bool = false) {
         guard !running else { return }
         guard ScreenPermission.granted else {
             ScreenPermission.request()
@@ -67,10 +70,10 @@ final class CaptureCoordinator: ObservableObject {
         }
         needsPermission = false
         running = true
-        Task { await run(action, fromUI: fromUI, delay: delay ?? settings.delaySeconds) }
+        Task { await run(action, fromUI: fromUI, delay: delay ?? settings.delaySeconds, menu: menu) }
     }
 
-    private func run(_ action: CaptureAction, fromUI: Bool, delay: Int) async {
+    private func run(_ action: CaptureAction, fromUI: Bool, delay: Int, menu: Bool = false) async {
         defer { if overlay == nil { running = false; restoreAfterCapture() } }
         do {
             if fromUI {
@@ -103,15 +106,44 @@ final class CaptureCoordinator: ObservableObject {
                 async let windows = CaptureService.windows()
                 let (f, w) = try await (frozen, windows)
                 let o = SelectionOverlay(frozen: f, windows: w, mode: action == .window ? .window : .region) { [weak self] result in
-                    self?.overlay = nil
-                    self?.handle(result, source: source)
+                    guard let self else { return }
+                    self.overlay = nil
+                    self.toolbar.hide()
+                    if let next = self.switchingTo {
+                        // Picked fullscreen or delayed in the menu: carry on with that instead (still "running").
+                        self.switchingTo = nil
+                        Task {
+                            try? await Task.sleep(nanoseconds: 200_000_000)
+                            await self.run(next, fromUI: false, delay: self.settings.delaySeconds)
+                        }
+                        return
+                    }
+                    self.handle(result, source: source)
                 }
                 overlay = o
                 o.show()
+                if menu { showMenu(over: o, current: action == .window ? .window : .region) }
             }
         } catch {
             fail(error)
         }
+    }
+
+    /// The window's capture button: starts a region capture and shows the floating menu to switch kind or close.
+    func startFromMenu() { perform(.region, fromUI: true, menu: true) }
+
+    private func showMenu(over o: SelectionOverlay, current: CaptureAction) {
+        toolbar.onPick = { [weak self, weak o] pick in
+            guard let self, let o else { return }
+            switch pick {
+            case nil: o.cancel()
+            case .region?: o.setMode(.region)
+            case .window?: o.setMode(.window)
+            case let next?: self.switchingTo = next; o.cancel()
+            }
+        }
+        o.onModeChange = { [weak self] m in self?.toolbar.model.current = m == .window ? .window : .region }
+        toolbar.show(current: current)
     }
 
     /// Undoes the hiding done before a capture started from a button, so the window is there again afterwards.

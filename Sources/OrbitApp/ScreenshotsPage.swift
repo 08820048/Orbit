@@ -111,45 +111,26 @@ private struct ScreenshotsContent: View {
             }
             Spacer()
             HStack(spacing: 10) {
-                chip("区域", "viewfinder", .region)
-                chip("窗口", "macwindow", .window)
-                chip("全屏", "display", .fullscreen)
-                chip("延时", "timer", .delayed)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    TextField("搜索文件名、应用", text: $search).textFieldStyle(.plain).font(.system(size: 12))
+                }
+                .padding(.horizontal, 10).frame(width: 220, height: 30)
+                .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Button("在 Finder 中显示") { NSWorkspace.shared.open(settings.folderURL) }.glassButton()
+                Button { capture.startFromMenu() } label: {
+                    Image(systemName: "camera.viewfinder").font(.system(size: 15, weight: .semibold)).frame(width: 22, height: 18)
+                }
+                .glassButton(primary: true).help(Text("截图"))
             }
             .padding(.bottom, 4).fixedSize()
         }
-    }
-
-    private func chip(_ title: LocalizedStringKey, _ symbol: String, _ action: CaptureAction) -> some View {
-        Button { capture.perform(action, fromUI: true) } label: {
-            HStack(spacing: 8) {
-                Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accentHi)
-                Text(title).font(.system(size: 13, weight: .medium)).fixedSize()
-                HStack(spacing: 2) {
-                    ForEach(Array(settings.combo(action).keycaps.enumerated()), id: \.offset) { _, cap in
-                        Text(cap).font(.system(size: 11)).foregroundStyle(Theme.text2)
-                            .frame(minWidth: 18, minHeight: 18).padding(.horizontal, 2)
-                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                }
-            }
-        }
-        .buttonStyle(CaptureChipStyle())
-        .focusable(false)
-        .help(action.title)
     }
 
     private var filterRow: some View {
         HStack(spacing: 12) {
             GlassSegmented(options: [CaptureKind?.none, .region, .window, .fullscreen], label: { $0?.label ?? String(localized: "全部") }, selection: $kind)
             Spacer()
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.text2)
-                TextField("搜索文件名、应用", text: $search).textFieldStyle(.plain).font(.system(size: 12))
-            }
-            .padding(.horizontal, 10).frame(width: 220, height: 30)
-            .background(Theme.control, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            Button("在 Finder 中显示") { NSWorkspace.shared.open(settings.folderURL) }.glassButton()
         }
     }
 
@@ -220,16 +201,6 @@ private struct ScreenshotsContent: View {
     static func shortPath(_ path: String) -> String {
         let home = NSHomeDirectory()
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
-    }
-}
-
-private struct CaptureChipStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, 12).frame(height: 34)
-            .background(Theme.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.glassHairline, lineWidth: 0.5))
-            .brightness(configuration.isPressed ? -0.08 : 0)
     }
 }
 

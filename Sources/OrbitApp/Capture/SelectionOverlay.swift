@@ -44,11 +44,18 @@ final class SelectionOverlay {
 
     // MARK: State changes (called by the views)
 
-    func toggleMode() {
-        mode = mode == .region ? .window : .region
+    /// Called when the mode changes, so the floating menu can follow.
+    var onModeChange: ((SelectionMode) -> Void)?
+
+    func toggleMode() { setMode(mode == .region ? .window : .region) }
+
+    func setMode(_ new: SelectionMode) {
+        guard new != mode else { return }
+        mode = new
         drag = nil
         updateHover()
         refresh()
+        onModeChange?(new)
     }
 
     func mouseMoved() {
