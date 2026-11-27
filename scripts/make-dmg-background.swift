@@ -18,8 +18,8 @@ func draw(scale: Int) -> NSBitmapImageRep {
     // Flip to a top-left origin so the numbers match Finder's icon positions.
     ctx.translateBy(x: 0, y: H); ctx.scaleBy(x: 1, y: -1)
 
-    // Sky: one flat colour, no gradients
-    rgb(13, 24, 54).setFill()
+    // Light, flat: Finder draws the icon names in black, so the sky has to be light to keep them readable
+    rgb(238, 242, 249).setFill()
     NSRect(x: 0, y: 0, width: W, height: H).fill()
 
     // Stars (fixed seed so the file is reproducible)
@@ -27,14 +27,14 @@ func draw(scale: Int) -> NSBitmapImageRep {
     func rnd() -> Double { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return Double(seed >> 33) / Double(1 << 31) }
     for _ in 0..<70 {
         let x = rnd() * Double(W), y = rnd() * Double(H), r = 0.4 + rnd() * 1.0
-        rgb(200, 220, 255, 0.25 + rnd() * 0.5).setFill()
+        rgb(90, 130, 200, 0.12 + rnd() * 0.28).setFill()
         NSBezierPath(ovalIn: NSRect(x: x - r, y: y - r, width: r * 2, height: r * 2)).fill()
     }
 
     // A big faint orbit around the whole scene
     ctx.saveGState()
     ctx.translateBy(x: W / 2, y: 214); ctx.rotate(by: -12 * .pi / 180)
-    rgb(150, 190, 255, 0.10).setStroke()
+    rgb(60, 100, 170, 0.16).setStroke()
     let big = NSBezierPath(ovalIn: NSRect(x: -380, y: -120, width: 760, height: 240)); big.lineWidth = 1; big.stroke()
     ctx.restoreGState()
 
@@ -43,7 +43,7 @@ func draw(scale: Int) -> NSBitmapImageRep {
     let ctrl = CGPoint(x: (a.x + b.x) / 2, y: a.y - 52)
     let arc = NSBezierPath(); arc.move(to: a); arc.curve(to: b, controlPoint1: CGPoint(x: a.x + (b.x - a.x) / 3, y: ctrl.y), controlPoint2: CGPoint(x: b.x - (b.x - a.x) / 3, y: ctrl.y))
     arc.lineWidth = 2; arc.lineCapStyle = .round; arc.setLineDash([2, 7], count: 2, phase: 0)
-    rgb(190, 215, 255, 0.55).setStroke(); arc.stroke()
+    rgb(70, 100, 160, 0.65).setStroke(); arc.stroke()
     // arrow head at b, pointing along the tangent (down-right)
     let tangent = atan2(b.y - ctrl.y, (b.x - a.x) / 3)   // direction of the curve as it arrives at b
     let head = NSBezierPath()
@@ -54,7 +54,7 @@ func draw(scale: Int) -> NSBitmapImageRep {
         else { head.line(to: CGPoint(x: tip.x + 12 * cos(ang), y: tip.y + 12 * sin(ang))) }
     }
     head.lineWidth = 2.4; head.lineCapStyle = .round; head.lineJoinStyle = .round
-    rgb(210, 228, 255, 0.9).setStroke(); head.stroke()
+    rgb(50, 80, 140).setStroke(); head.stroke()
     // planet riding the arc
     let t: CGFloat = 0.5, mt = 1 - t
     let p1 = CGPoint(x: a.x + (b.x - a.x) / 3, y: ctrl.y), p2 = CGPoint(x: b.x - (b.x - a.x) / 3, y: ctrl.y)
@@ -72,9 +72,9 @@ func draw(scale: Int) -> NSBitmapImageRep {
         str.draw(at: NSPoint(x: (W - sz.width) / 2, y: 0))
         ctx.restoreGState()
     }
-    text("ORBIT", size: 13, weight: .semibold, color: rgb(160, 195, 255, 0.85), y: 34, kern: 5)
-    text("把 Orbit 拖到「应用程序」", size: 15, weight: .medium, color: rgb(235, 242, 255, 0.95), y: 338)
-    text("Drag Orbit to Applications", size: 12, weight: .regular, color: rgb(160, 185, 230, 0.75), y: 362)
+    text("ORBIT", size: 13, weight: .semibold, color: rgb(40, 100, 220), y: 34, kern: 5)
+    text("把 Orbit 拖到「应用程序」", size: 15, weight: .medium, color: rgb(20, 32, 64), y: 338)
+    text("Drag Orbit to Applications", size: 12, weight: .regular, color: rgb(95, 115, 155), y: 362)
 
     NSGraphicsContext.restoreGraphicsState()
     return rep
