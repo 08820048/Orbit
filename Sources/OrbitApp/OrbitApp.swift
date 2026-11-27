@@ -21,16 +21,24 @@ final class OrbitAppDelegate: NSObject, NSApplicationDelegate {
     /// Closing the window must not quit: the shortcuts and the menu bar icon keep working.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// Clicking the Dock icon: bring the main window back unless it is already on screen. An open editor window must not count,
+    /// or the main window could never be reached again while an editor is open.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { MainActor.assumeIsolated { WindowOpener.shared.showMain() } }
-        return true
+        MainActor.assumeIsolated {
+            if !WindowOpener.mainWindowIsVisible { WindowOpener.shared.showMain() }
+        }
+        return false
     }
 
     static func focusMainWindow() {
-        // Never fight the selection overlay for the key window.
-        if NSApp.windows.contains(where: { $0 is OverlayWindow && $0.isVisible }) { return }
-        guard let window = NSApp.windows.first(where: { $0.canBecomeKey && $0.isVisible && $0.level == .normal }), !window.isKeyWindow else { return }
-        window.makeKeyAndOrderFront(nil)
+        MainActor.assumeIsolated {
+            // Never fight the selection overlay for the key window.
+            if NSApp.windows.contains(where: { $0 is OverlayWindow && $0.isVisible }) { return }
+            // Only the main window: an editor window being key is exactly right.
+            guard !NSApp.windows.contains(where: { $0 is EditorWindow && $0.isKeyWindow }),
+                  let window = WindowOpener.mainWindow, window.isVisible, !window.isKeyWindow else { return }
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 }
 
@@ -41,9 +49,20 @@ final class WindowOpener {
     /// Set by a view that has access to SwiftUI's `openWindow`.
     var open: (() -> Void)?
 
+    /// The main window: a normal titled window that is not an editor, an overlay or a panel.
+    static var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.canBecomeKey && $0.level == .normal && $0.styleMask.contains(.titled)
+            && !($0 is NSPanel) && !($0 is EditorWindow) && !($0 is OverlayWindow) }
+    }
+
+    static var mainWindowIsVisible: Bool { mainWindow.map { $0.isVisible && !$0.isMiniaturized } ?? false }
+
     func showMain() {
+        // The app may have been hidden while a screenshot was taken from a button; bring everything back.
+        if NSApp.isHidden { NSApp.unhide(nil) }
         NSApp.activate(ignoringOtherApps: true)
-        if let w = NSApp.windows.first(where: { $0.canBecomeKey && $0.level == .normal && $0.styleMask.contains(.titled) && !($0 is NSPanel) }) {
+        if let w = Self.mainWindow {
+            if w.isMiniaturized { w.deminiaturize(nil) }
             w.makeKeyAndOrderFront(nil)
         } else {
             open?()
@@ -92,6 +111,9 @@ struct OrbitApp: App {
             }
             CommandGroup(after: .newItem) {
                 Button("刷新数据") { Task { await model.refresh() } }.keyboardShortcut("r")
+            }
+            CommandGroup(after: .windowArrangement) {
+                Button("Orbit 主窗口") { WindowOpener.shared.showMain() }.keyboardShortcut("0")
             }
         }
 
@@ -506,6 +528,8 @@ enum CaptureSelfTest {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         guard let record = try? CaptureService.save(base, kind: .region, source: "Safari", scale: 2, format: .png, folder: dir, date: Date()),
               let controller = EditorWindowController(record: record, capture: model.capture) else { return }
+        let main = WindowOpener.mainWindow
+        FileHandle.standardError.write(Data("SELFTEST main window found: \(main != nil), is an editor: \(main is EditorWindow), editor counted as main visible: \(NSApp.windows.filter { $0 is EditorWindow }.contains { WindowOpener.mainWindow === $0 })\n".utf8))
         let savedStyle = BeautifyStore.load()          // the self-test changes the style; put it back afterwards
         defer { BeautifyStore.save(savedStyle) }
         let window = controller.window!

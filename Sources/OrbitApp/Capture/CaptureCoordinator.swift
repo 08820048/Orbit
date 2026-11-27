@@ -21,6 +21,8 @@ final class CaptureCoordinator: ObservableObject {
 
     private var overlay: SelectionOverlay?
     private var running = false
+    /// Orbit hid itself to stay out of the picture; it comes back once the shot is saved or cancelled.
+    private var hiddenForCapture = false
     private let quick = QuickAccessController()
     private var hotKeyIDs: [CaptureAction: UInt32] = [:]
     private var bag = Set<AnyCancellable>()
@@ -65,11 +67,12 @@ final class CaptureCoordinator: ObservableObject {
     }
 
     private func run(_ action: CaptureAction, fromUI: Bool, delay: Int) async {
-        defer { if overlay == nil { running = false } }
+        defer { if overlay == nil { running = false; restoreAfterCapture() } }
         do {
             if fromUI {
                 // Started from a button or menu: get Orbit's own windows out of the picture first.
                 NSApp.hide(nil)
+                hiddenForCapture = true
                 try? await Task.sleep(nanoseconds: 350_000_000)
             }
             if action == .delayed {
@@ -98,7 +101,15 @@ final class CaptureCoordinator: ObservableObject {
         }
     }
 
+    /// Undoes the hiding done before a capture started from a button, so the window is there again afterwards.
+    private func restoreAfterCapture() {
+        guard hiddenForCapture else { return }
+        hiddenForCapture = false
+        if NSApp.isHidden { NSApp.unhide(nil) }
+    }
+
     private func handle(_ result: SelectionResult, source: String?) {
+        defer { restoreAfterCapture() }
         switch result {
         case .cancelled:
             running = false

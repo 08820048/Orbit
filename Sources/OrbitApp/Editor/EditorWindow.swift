@@ -3,6 +3,9 @@ import ImageIO
 import OrbitCore
 import SwiftUI
 
+/// A distinct type so "the main window" can be told apart from editors when looking for it.
+final class EditorWindow: NSWindow {}
+
 /// One annotation editor window: loads the screenshot, hosts the editor, saves, and asks before losing changes.
 @MainActor
 final class EditorWindowController: NSObject, NSWindowDelegate {
@@ -18,7 +21,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         self.capture = capture
         super.init()
 
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 820),
+        let w = EditorWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 820),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                          backing: .buffered, defer: false)
         w.titlebarAppearsTransparent = true
