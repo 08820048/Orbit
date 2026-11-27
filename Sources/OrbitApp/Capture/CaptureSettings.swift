@@ -68,7 +68,7 @@ struct KeyCombo: Codable, Equatable {
 
 /// What a global shortcut does.
 enum CaptureAction: String, CaseIterable, Codable, Identifiable {
-    case region, window, fullscreen, delayed
+    case region, window, fullscreen, delayed, repeatLast
     var id: String { rawValue }
 
     var title: String {
@@ -77,6 +77,7 @@ enum CaptureAction: String, CaseIterable, Codable, Identifiable {
         case .window: "窗口截图"
         case .fullscreen: "全屏截图"
         case .delayed: "延时截图"
+        case .repeatLast: "重复上一次区域"
         }
     }
 
@@ -88,6 +89,7 @@ enum CaptureAction: String, CaseIterable, Codable, Identifiable {
         case .window: return KeyCombo(keyCode: UInt32(kVK_ANSI_5), modifiers: m)
         case .fullscreen: return KeyCombo(keyCode: UInt32(kVK_ANSI_3), modifiers: m)
         case .delayed: return KeyCombo(keyCode: UInt32(kVK_ANSI_6), modifiers: m)
+        case .repeatLast: return KeyCombo(keyCode: UInt32(kVK_ANSI_R), modifiers: m)
         }
     }
 }

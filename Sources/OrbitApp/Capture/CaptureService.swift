@@ -37,6 +37,21 @@ struct FrozenScreen {
     let image: CGImage
     /// Pixels per point.
     var scale: CGFloat { CGFloat(image.width) / screen.frame.width }
+
+    /// The pixels under `rect`, given in points relative to this screen (origin bottom-left).
+    func crop(_ rect: CGRect) -> CGImage? {
+        let s = scale
+        let bounds = CGRect(origin: .zero, size: screen.frame.size)
+        let r = rect.intersection(bounds)
+        guard !r.isNull, r.width >= 1, r.height >= 1 else { return nil }
+        return image.cropping(to: CGRect(x: r.minX * s, y: (screen.frame.height - r.maxY) * s, width: r.width * s, height: r.height * s).integral)
+    }
+}
+
+/// An area on a screen, in global AppKit points, so the same area can be captured again.
+struct RegionArea: Codable, Equatable {
+    var rect: CGRect
+    var screenFrame: CGRect
 }
 
 /// A window we can hover over and capture.

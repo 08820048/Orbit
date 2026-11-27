@@ -21,6 +21,10 @@ final class CaptureCoordinator: ObservableObject {
 
     private var overlay: SelectionOverlay?
     private var running = false
+    /// The last region captured with the region tool, remembered across launches for 重复上一次区域.
+    private(set) var lastRegion: RegionArea? = {
+        UserDefaults.standard.data(forKey: "orbit.shot.lastRegion").flatMap { try? JSONDecoder().decode(RegionArea.self, from: $0) }
+    }()
     /// Orbit hid itself to stay out of the picture; it comes back once the shot is saved or cancelled.
     private var hiddenForCapture = false
     private let quick = QuickAccessController()
@@ -85,6 +89,15 @@ final class CaptureCoordinator: ObservableObject {
                 let mouse = NSEvent.mouseLocation
                 let pick = screens.first { $0.screen.frame.contains(mouse) } ?? screens[0]
                 try finish(pick.image, kind: .fullscreen, source: source, scale: Double(pick.scale))
+            case .repeatLast:
+                guard let area = lastRegion else { notice("还没有可以重复的区域", "先用「区域截图」截一次，之后就能用这个快捷键重复同一块区域。"); return }
+                let screens = try await CaptureService.freezeScreens(includeCursor: settings.includeCursor)
+                let center = CGPoint(x: area.rect.midX, y: area.rect.midY)
+                guard let f = screens.first(where: { $0.screen.frame == area.screenFrame }) ?? screens.first(where: { $0.screen.frame.contains(center) }),
+                      let image = f.crop(area.rect.offsetBy(dx: -f.screen.frame.minX, dy: -f.screen.frame.minY)) else {
+                    notice("找不到上次的区域", "那块区域所在的显示器现在不可用。"); return
+                }
+                try finish(image, kind: .region, source: source, scale: Double(f.scale))
             case .region, .delayed, .window:
                 async let frozen = CaptureService.freezeScreens(includeCursor: settings.includeCursor)
                 async let windows = CaptureService.windows()
@@ -113,8 +126,10 @@ final class CaptureCoordinator: ObservableObject {
         switch result {
         case .cancelled:
             running = false
-        case let .region(image, scale):
+        case let .region(image, scale, area):
             defer { running = false }
+            lastRegion = area
+            if let data = try? JSONEncoder().encode(area) { UserDefaults.standard.set(data, forKey: "orbit.shot.lastRegion") }
             do { try finish(image, kind: .region, source: source, scale: scale) } catch { fail(error) }
         case let .window(window):
             Task {
@@ -163,6 +178,15 @@ final class CaptureCoordinator: ObservableObject {
             let scale = max(record.scale, 1)
             showQuickPanel(for: record, image: NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)))
         }
+    }
+
+    /// A short message for something that is not an error but needs saying (nothing to repeat yet…).
+    private func notice(_ title: String, _ detail: String) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = detail
+        alert.runModal()
     }
 
     private func fail(_ error: Error) {

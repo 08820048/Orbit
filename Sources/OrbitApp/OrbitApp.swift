@@ -148,6 +148,7 @@ private struct MenuBarContent: View {
                 Button("\(sec) 秒") { s.delaySeconds = sec; model.capture.perform(.delayed, fromUI: true) }
             }
         }
+        item(CaptureAction.repeatLast.title, action: .repeatLast, combo: s.combo(.repeatLast))
         Divider()
         Button("打开 Orbit") { WindowOpener.shared.showMain() }.keyboardShortcut("o")
         Button("设置…") { model.section = .settings; WindowOpener.shared.showMain() }.keyboardShortcut(",")

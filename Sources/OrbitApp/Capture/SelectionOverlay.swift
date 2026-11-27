@@ -5,7 +5,7 @@ enum SelectionMode { case region, window }
 
 enum SelectionResult {
     /// The cropped pixels, ready to save.
-    case region(CGImage, scale: Double)
+    case region(CGImage, scale: Double, area: RegionArea)
     case window(CapturableWindow)
     case cancelled
 }
@@ -79,9 +79,8 @@ final class SelectionOverlay {
         guard mode == .region, let d = drag, d.screen == screen else { return }
         guard let rect = selection(), rect.width >= 4, rect.height >= 4 else { drag = nil; refresh(); return }
         let f = frozen[d.screen]
-        let s = f.scale
-        let pixels = CGRect(x: rect.minX * s, y: (f.screen.frame.height - rect.maxY) * s, width: rect.width * s, height: rect.height * s).integral
-        if let cropped = f.image.cropping(to: pixels) { finish(.region(cropped, scale: Double(s))) } else { finish(.cancelled) }
+        let area = RegionArea(rect: rect.offsetBy(dx: f.screen.frame.minX, dy: f.screen.frame.minY), screenFrame: f.screen.frame)
+        if let cropped = f.crop(rect) { finish(.region(cropped, scale: Double(f.scale), area: area)) } else { finish(.cancelled) }
     }
 
     func cancel() { finish(.cancelled) }
