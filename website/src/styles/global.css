@@ -1,0 +1,104 @@
+@import '@fontsource-variable/geist';
+
+:root {
+  --window: #0a0f1c;
+  --text: #eef3ff;
+  --text-2: #8fa3c8;
+  --panel: rgba(255, 255, 255, 0.06);
+  --control: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.1);
+  --accent: #3b82f6;
+  --accent-hi: #7fb0ff;
+  --font: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+* { margin: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background-color: var(--window);
+  background-image: linear-gradient(rgba(143, 163, 200, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(143, 163, 200, 0.07) 1px, transparent 1px);
+  background-size: 80px 80px;
+  background-position: -1px -1px;
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; height: auto; }
+
+.wrap { width: min(1200px, calc(100% - 48px)); margin: 0 auto; }
+.lead { font-size: 19px; line-height: 1.75; color: var(--text-2); }
+h2 { font-size: clamp(36px, 5vw, 60px); line-height: 1.14; font-weight: 600; letter-spacing: -0.025em; }
+
+/* Nav */
+.nav-wrap { position: sticky; top: 0; z-index: 10; height: 96px; display: flex; justify-content: center; pointer-events: none; }
+.nav { pointer-events: auto; margin-top: 22px; height: 52px; border-radius: 26px; background: rgba(20, 26, 42, 0.86); backdrop-filter: blur(14px); display: flex; align-items: center; gap: 34px; padding: 0 10px 0 22px; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 9px; font-size: 16px; font-weight: 600; }
+.brand img { width: 26px; height: 26px; }
+.nav a.link { font-size: 14px; color: var(--text-2); transition: color 0.15s; }
+.nav a.link:hover { color: var(--text); }
+.nav a.cta { height: 36px; line-height: 36px; padding: 0 18px; border-radius: 18px; background: var(--accent); font-size: 14px; font-weight: 600; color: #fff; }
+
+/* Buttons */
+.pill { display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 28px; border-radius: 26px; font-size: 16px; font-weight: 600; transition: filter 0.15s, transform 0.15s; }
+.pill:hover { filter: brightness(1.12); }
+.pill:active { transform: scale(0.98); }
+.pill.a { background: var(--accent); color: #fff; }
+.pill.g { background: var(--control); color: var(--text); }
+.eyebrow { display: inline-block; height: 30px; line-height: 30px; padding: 0 14px; border-radius: 15px; background: var(--control); font-size: 13px; color: var(--accent-hi); font-weight: 500; }
+
+/* Hero */
+.hero { padding-top: 104px; text-align: center; }
+.hero h1 { font-size: clamp(48px, 8vw, 112px); line-height: 1.08; font-weight: 600; letter-spacing: -0.035em; margin-top: 34px; }
+.hero .lead { max-width: 660px; margin: 34px auto 0; font-size: 21px; }
+.hero .actions { display: flex; gap: 14px; justify-content: center; margin-top: 44px; flex-wrap: wrap; }
+.hero .facts { font-size: 14px; color: var(--text-2); margin-top: 22px; }
+.shot { position: relative; margin-top: 88px; }
+.shot > img { width: 100%; border-radius: 18px; box-shadow: 0 0 0 1px var(--line); }
+.capture-menu { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; background: #1b1f2b; border-radius: 16px; padding: 7px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 16px 40px rgba(0, 0, 0, 0.5); color: #fff; }
+.capture-menu .close { width: 34px; height: 48px; display: flex; align-items: center; justify-content: center; }
+.capture-menu .sep { width: 1px; height: 24px; background: rgba(255, 255, 255, 0.14); margin: 0 4px; }
+.capture-menu .item { min-width: 66px; padding: 0 8px; height: 50px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; white-space: nowrap; }
+.capture-menu .item.on { background: rgba(255, 255, 255, 0.16); }
+
+/* Sections */
+section.block { padding-top: 200px; }
+.modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; margin-top: 80px; }
+.keys { display: flex; gap: 8px; }
+.key { display: inline-flex; align-items: center; justify-content: center; min-width: 56px; height: 56px; padding: 0 14px; border-radius: 14px; background: var(--control); font-size: 24px; font-weight: 500; }
+.mode h3, .point h3 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+.mode h3 { margin-top: 32px; }
+.mode p, .point p { font-size: 16px; line-height: 1.75; color: var(--text-2); margin-top: 10px; }
+.split { display: grid; grid-template-columns: 420px 1fr; gap: 80px; align-items: center; }
+.split h2 { margin-top: 22px; }
+.split .lead { margin-top: 24px; }
+.split img { width: 100%; max-width: 700px; aspect-ratio: 1; object-fit: cover; border-radius: 20px; justify-self: end; }
+.center { text-align: center; }
+.center h2 { margin-top: 22px; }
+.center .lead { max-width: 640px; margin: 24px auto 0; }
+.center img { width: 100%; max-width: 1100px; margin: 72px auto 0; border-radius: 22px; }
+.points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; margin-top: 80px; }
+.final { padding-top: 240px; text-align: center; }
+.final img { width: 96px; height: 96px; margin: 0 auto; }
+.final h2 { margin-top: 36px; font-size: clamp(44px, 6vw, 72px); }
+.final .lead { margin-top: 20px; }
+.final .actions { display: flex; gap: 14px; justify-content: center; margin-top: 40px; flex-wrap: wrap; }
+.final .note { font-size: 14px; color: var(--text-2); margin-top: 22px; }
+footer { padding: 160px 0 56px; }
+footer .row { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-2); gap: 24px; flex-wrap: wrap; }
+footer .row div { display: flex; gap: 32px; }
+footer a:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .nav { gap: 18px; padding-left: 16px; }
+  .nav a.link:not(.keep) { display: none; }
+  section.block { padding-top: 120px; }
+  .modes { grid-template-columns: repeat(2, 1fr); gap: 40px 24px; margin-top: 48px; }
+  .split { grid-template-columns: 1fr; gap: 40px; }
+  .split img { justify-self: stretch; max-width: none; }
+  .points { grid-template-columns: 1fr; gap: 32px; margin-top: 48px; }
+  .capture-menu { transform: translateX(-50%) scale(0.8); bottom: -28px; }
+  .shot { margin-top: 64px; }
+  .hero .lead, .lead { font-size: 17px; }
+}

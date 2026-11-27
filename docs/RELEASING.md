@@ -41,7 +41,7 @@
    - `Orbit-<版本>.zip`：Sparkle 更新用的压缩包（已用 EdDSA 签名）
    - `appcast.xml`：更新清单
 
-   在 GitHub 上建 Release `v<版本>`，**三个文件都上传**。应用的更新地址是 `releases/latest/download/appcast.xml`，所以最新 Release 里的 `appcast.xml` 就是所有旧版本检查更新时读到的清单。
+   在 GitHub 上建 Release `v<版本>`，**三个文件都上传**。然后改 `website/src/site.ts` 的 `VERSION` 并重新部署官网（见 `docs/WEBSITE.md`）。应用的更新地址是 `releases/latest/download/appcast.xml`，所以最新 Release 里的 `appcast.xml` 就是所有旧版本检查更新时读到的清单。
 
 ## 更新是怎么工作的
 

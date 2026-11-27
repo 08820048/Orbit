@@ -1,0 +1,110 @@
+---
+import { t, type Lang } from '../i18n';
+import { DMG_URL, REPO, RELEASES_URL, VERSION } from '../site';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const c = t[lang];
+const ex = lang === 'zh' ? '' : '/en';
+const download = (cls: string, label: string) => ({ cls, label });
+---
+<div class="nav-wrap">
+  <nav class="nav" aria-label="Main">
+    <a class="brand keep" href={lang === 'zh' ? '/' : '/en/'}><img src="/img/icon.png" alt="" width="26" height="26" />Orbit</a>
+    <a class="link" href="#features">{c.nav.features}</a>
+    <a class="link" href="#share">{c.nav.share}</a>
+    <a class="link" href="#privacy">{c.nav.privacy}</a>
+    <a class="link" href={REPO}>{c.nav.github}</a>
+    <a class="cta keep" href={DMG_URL}>{c.nav.download}</a>
+  </nav>
+</div>
+
+<main>
+  <section class="hero wrap">
+    <span class="eyebrow">{c.eyebrow}</span>
+    <h1>{c.h1[0]}<br />{c.h1[1]}</h1>
+    <p class="lead">{c.lead}</p>
+    <div class="actions">
+      <a class="pill a" href={DMG_URL}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" /></svg>{c.download}
+      </a>
+      <a class="pill g" href={REPO}>{c.source}</a>
+    </div>
+    <div class="facts">{c.facts}</div>
+
+    <div class="shot">
+      <img src={`/img/library-${lang}.jpg`} alt={c.libraryAlt} width="2400" height="1050" fetchpriority="high" />
+      <div class="capture-menu" aria-hidden="true">
+        <span class="close"><svg width="12" height="12" viewBox="0 0 12 12" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8" /></svg></span>
+        <i class="sep"></i>
+        <div class="item on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M4 9V5h4M16 5h4v4M20 15v4h-4M8 19H4v-4" /></svg>{c.menu.region}</div>
+        <div class="item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 9h18" /></svg>{c.menu.window}</div>
+        <div class="item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6M12 16v4" /></svg>{c.menu.fullscreen}</div>
+        <div class="item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="7" /><path d="M12 9v4l2.5 2M9.5 3h5" /></svg>{c.menu.delayed}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block wrap" id="features">
+    <h2>{c.featuresTitle[0]}<br />{c.featuresTitle[1]}</h2>
+    <p class="lead" style="max-width:560px;margin-top:24px">{c.featuresLead}</p>
+    <div class="modes">
+      {c.modes.map((m) => (
+        <div class="mode">
+          <div class="keys">{m.keys.map((k) => <span class="key">{k}</span>)}</div>
+          <h3>{m.name}</h3>
+          <p>{m.text}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="block wrap">
+    <div class="split">
+      <div>
+        <span class="eyebrow">{c.editEyebrow}</span>
+        <h2>{c.editTitle[0]}<br />{c.editTitle[1]}</h2>
+        <p class="lead">{c.editLead}</p>
+      </div>
+      <img src="/img/beautified.jpg" alt={c.editAlt} width="1600" height="1600" loading="lazy" />
+    </div>
+  </section>
+
+  <section class="block wrap center" id="share">
+    <span class="eyebrow">{c.shareEyebrow}</span>
+    <h2>{c.shareTitle[0]}<br />{c.shareTitle[1]}</h2>
+    <p class="lead">{c.shareLead}</p>
+    <img src="/img/share.jpg" alt={c.shareAlt} width="2000" height="1125" loading="lazy" />
+  </section>
+
+  <section class="block wrap" id="privacy">
+    <h2>{c.privacyTitle[0]}<br />{c.privacyTitle[1]}</h2>
+    <div class="points">
+      {c.privacy.map((p) => (
+        <div class="point"><h3>{p.name}</h3><p>{p.text}</p></div>
+      ))}
+    </div>
+  </section>
+
+  <section class="final wrap">
+    <img src="/img/icon.png" alt="" width="96" height="96" loading="lazy" />
+    <h2>{c.ctaTitle}</h2>
+    <p class="lead">{c.ctaLead}</p>
+    <div class="actions">
+      <a class="pill a" href={DMG_URL}>{c.ctaDownload(VERSION)}</a>
+      <a class="pill g" href={REPO}>GitHub</a>
+    </div>
+    <div class="note">{c.ctaNote}</div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <span>{c.footer.license}</span>
+    <div>
+      <a href={REPO}>GitHub</a>
+      <a href={RELEASES_URL}>{c.footer.releases}</a>
+      <a href={c.footer.otherHref} hreflang={lang === 'zh' ? 'en' : 'zh-Hans'}>{c.footer.other}</a>
+    </div>
+  </div>
+</footer>
