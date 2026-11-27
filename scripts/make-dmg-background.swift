@@ -18,12 +18,9 @@ func draw(scale: Int) -> NSBitmapImageRep {
     // Flip to a top-left origin so the numbers match Finder's icon positions.
     ctx.translateBy(x: 0, y: H); ctx.scaleBy(x: 1, y: -1)
 
-    // Sky
-    NSGradient(colors: [rgb(8, 14, 32), rgb(14, 26, 62), rgb(24, 44, 104)], atLocations: [0, 0.6, 1], colorSpace: .sRGB)!
-        .draw(in: NSRect(x: 0, y: 0, width: W, height: H), angle: -90)
-    // Soft glow behind the middle
-    NSGradient(colors: [rgb(70, 130, 255, 0.22), rgb(70, 130, 255, 0)])!
-        .draw(fromCenter: CGPoint(x: W / 2, y: 230), radius: 0, toCenter: CGPoint(x: W / 2, y: 230), radius: 300, options: [])
+    // Sky: one flat colour, no gradients
+    rgb(13, 24, 54).setFill()
+    NSRect(x: 0, y: 0, width: W, height: H).fill()
 
     // Stars (fixed seed so the file is reproducible)
     var seed: UInt64 = 7
@@ -43,12 +40,12 @@ func draw(scale: Int) -> NSBitmapImageRep {
 
     // The path from the app to Applications: a dashed arc with a small planet and an arrow head.
     let a = CGPoint(x: appCenter.x + 86, y: appCenter.y - 6), b = CGPoint(x: dropCenter.x - 92, y: dropCenter.y - 6)
-    let ctrl = CGPoint(x: (a.x + b.x) / 2, y: a.y - 44)
-    let arc = NSBezierPath(); arc.move(to: a); arc.curve(to: b, controlPoint1: CGPoint(x: a.x + 60, y: ctrl.y), controlPoint2: CGPoint(x: b.x - 60, y: ctrl.y))
+    let ctrl = CGPoint(x: (a.x + b.x) / 2, y: a.y - 52)
+    let arc = NSBezierPath(); arc.move(to: a); arc.curve(to: b, controlPoint1: CGPoint(x: a.x + (b.x - a.x) / 3, y: ctrl.y), controlPoint2: CGPoint(x: b.x - (b.x - a.x) / 3, y: ctrl.y))
     arc.lineWidth = 2; arc.lineCapStyle = .round; arc.setLineDash([2, 7], count: 2, phase: 0)
     rgb(190, 215, 255, 0.55).setStroke(); arc.stroke()
     // arrow head at b, pointing along the tangent (down-right)
-    let tangent = atan2(b.y - ctrl.y, 60.0)   // direction of the curve as it arrives at b
+    let tangent = atan2(b.y - ctrl.y, (b.x - a.x) / 3)   // direction of the curve as it arrives at b
     let head = NSBezierPath()
     for side in [-1.0, 1.0] {
         let ang = tangent + .pi + side * 0.55
@@ -60,13 +57,11 @@ func draw(scale: Int) -> NSBitmapImageRep {
     rgb(210, 228, 255, 0.9).setStroke(); head.stroke()
     // planet riding the arc
     let t: CGFloat = 0.5, mt = 1 - t
-    let p1 = CGPoint(x: a.x + 60, y: ctrl.y), p2 = CGPoint(x: b.x - 60, y: ctrl.y)
+    let p1 = CGPoint(x: a.x + (b.x - a.x) / 3, y: ctrl.y), p2 = CGPoint(x: b.x - (b.x - a.x) / 3, y: ctrl.y)
     let px = mt*mt*mt*a.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*b.x
     let py = mt*mt*mt*a.y + 3*mt*mt*t*p1.y + 3*mt*t*t*p2.y + t*t*t*b.y
-    NSGradient(colors: [rgb(196, 221, 255), rgb(79, 147, 255), rgb(11, 59, 168)], atLocations: [0, 0.45, 1], colorSpace: .sRGB)!
-        .draw(fromCenter: CGPoint(x: px - 2.5, y: py - 3), radius: 0, toCenter: CGPoint(x: px, y: py), radius: 8, options: [])
-    NSGradient(colors: [rgb(79, 147, 255, 0.35), rgb(79, 147, 255, 0)])!
-        .draw(fromCenter: CGPoint(x: px, y: py), radius: 0, toCenter: CGPoint(x: px, y: py), radius: 22, options: [])
+    rgb(79, 147, 255).setFill()
+    NSBezierPath(ovalIn: NSRect(x: px - 8, y: py - 8, width: 16, height: 16)).fill()
 
     // Text
     func text(_ s: String, size: CGFloat, weight: NSFont.Weight, color: NSColor, y: CGFloat, kern: CGFloat = 0) {
