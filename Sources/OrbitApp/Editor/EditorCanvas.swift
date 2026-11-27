@@ -50,29 +50,37 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
 
     private let margin: CGFloat = 40
 
-    /// Pixels shown per view point's inverse: view points per image pixel.
+    /// With beautify on the canvas is the whole finished picture (background, frame, padding) and the screenshot sits inside it.
+    private var frameInfo: BeautifyLayout? { model.showsFrame ? model.frameLayout() : nil }
+    /// Everything on screen, in image pixels.
+    private var extent: CGSize { frameInfo?.canvas ?? model.visibleRect.size }
+    /// Where the visible part of the screenshot starts inside that extent.
+    private var contentOffset: CGPoint { frameInfo?.content.origin ?? .zero }
+
+    /// View points per image pixel.
     private var scale: CGFloat {
-        let vis = model.visibleRect
-        guard vis.width > 0, vis.height > 0 else { return 1 }
-        let fit = min((bounds.width - 2 * margin) / vis.width, (bounds.height - 2 * margin) / vis.height)
+        let e = extent
+        guard e.width > 0, e.height > 0 else { return 1 }
+        let fit = min((bounds.width - 2 * margin) / e.width, (bounds.height - 2 * margin) / e.height)
         // Never bigger than the screenshot's own size in points.
         let natural = 1 / max(CGFloat(model.record.scale), 1)
         return max(0.01, min(fit, natural))
     }
 
+    /// Top-left of the extent in view space.
     private var imageOrigin: CGPoint {
-        let vis = model.visibleRect, s = scale
-        return CGPoint(x: (bounds.width - vis.width * s) / 2, y: (bounds.height - vis.height * s) / 2)
+        let e = extent, s = scale
+        return CGPoint(x: (bounds.width - e.width * s) / 2, y: (bounds.height - e.height * s) / 2)
     }
 
     private func toView(_ p: CGPoint) -> CGPoint {
-        let vis = model.visibleRect, s = scale, o = imageOrigin
-        return CGPoint(x: o.x + (p.x - vis.minX) * s, y: o.y + (p.y - vis.minY) * s)
+        let vis = model.visibleRect, s = scale, o = imageOrigin, c = contentOffset
+        return CGPoint(x: o.x + (c.x + p.x - vis.minX) * s, y: o.y + (c.y + p.y - vis.minY) * s)
     }
 
     private func toImage(_ p: CGPoint) -> CGPoint {
-        let vis = model.visibleRect, s = scale, o = imageOrigin
-        return CGPoint(x: (p.x - o.x) / s + vis.minX, y: (p.y - o.y) / s + vis.minY)
+        let vis = model.visibleRect, s = scale, o = imageOrigin, c = contentOffset
+        return CGPoint(x: (p.x - o.x) / s - c.x + vis.minX, y: (p.y - o.y) / s - c.y + vis.minY)
     }
 
     private func viewRect(_ r: CGRect) -> CGRect {
@@ -90,24 +98,40 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let vis = model.visibleRect, s = scale
-        let dst = viewRect(vis)
 
-        // Picture with a soft shadow.
-        ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 30, color: CGColor(gray: 0, alpha: 0.55))
-        ctx.setFillColor(CGColor(gray: 0.12, alpha: 1))
-        ctx.fill(dst)
-        ctx.restoreGState()
+        if let layout = frameInfo {
+            // Beautify on: the finished picture, live. Annotations are drawn inside the frame, exactly as the export will have them.
+            let o = imageOrigin
+            ctx.saveGState()
+            ctx.interpolationQuality = .high
+            ctx.translateBy(x: o.x, y: o.y)
+            ctx.scaleBy(x: s, y: s)
+            BeautifyRenderer.draw(in: ctx, layout: layout, style: model.style, ppp: model.pixelsPerPoint, dark: model.contentIsDark) { ctx in
+                ctx.translateBy(x: layout.content.minX - vis.minX, y: layout.content.minY - vis.minY)
+                AnnotationRenderer.drawImage(model.base, in: model.fullRect, ctx)
+                for a in model.items { drawAnnotation(a, ctx) }
+                if let draft { drawAnnotation(draft, ctx) }
+            }
+            ctx.restoreGState()
+        } else {
+            let dst = viewRect(vis)
+            // Picture with a soft shadow.
+            ctx.saveGState()
+            ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 30, color: CGColor(gray: 0, alpha: 0.55))
+            ctx.setFillColor(CGColor(gray: 0.12, alpha: 1))
+            ctx.fill(dst)
+            ctx.restoreGState()
 
-        ctx.saveGState()
-        ctx.clip(to: dst)
-        ctx.interpolationQuality = .high
-        ctx.translateBy(x: dst.minX - vis.minX * s, y: dst.minY - vis.minY * s)
-        ctx.scaleBy(x: s, y: s)
-        AnnotationRenderer.drawImage(model.base, in: model.fullRect, ctx)
-        for a in model.items { drawAnnotation(a, ctx) }
-        if let draft { drawAnnotation(draft, ctx) }
-        ctx.restoreGState()
+            ctx.saveGState()
+            ctx.clip(to: dst)
+            ctx.interpolationQuality = .high
+            ctx.translateBy(x: dst.minX - vis.minX * s, y: dst.minY - vis.minY * s)
+            ctx.scaleBy(x: s, y: s)
+            AnnotationRenderer.drawImage(model.base, in: model.fullRect, ctx)
+            for a in model.items { drawAnnotation(a, ctx) }
+            if let draft { drawAnnotation(draft, ctx) }
+            ctx.restoreGState()
+        }
 
         if model.tool == .crop, let r = model.cropRect { drawCropOverlay(r, ctx) }
         else if let a = model.selected, model.editingTextID == nil { drawHandles(for: a, ctx) }
@@ -215,6 +239,12 @@ final class EditorCanvasView: NSView, NSTextFieldDelegate {
         if model.tool == .crop {
             if let h = cropHandle(at: viewPoint) { drag = .cropResizing(handle: h) }
             else if let r = model.cropRect, r.contains(p) { drag = .cropMoving(start: p, original: r) }
+            return
+        }
+
+        // On the beautified canvas the padding and background are not part of the screenshot: clicking there only deselects.
+        if model.showsFrame, !model.visibleRect.contains(p), !(model.selected.flatMap { handle(of: $0, at: viewPoint) } != nil) {
+            model.select(nil)
             return
         }
 

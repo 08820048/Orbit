@@ -52,23 +52,18 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    enum Mode: String, CaseIterable, Identifiable {
-        case annotate = "标注", beautify = "美化"
-        var id: String { rawValue }
-    }
-
     let record: ScreenshotRecord
     let base: CGImage
     let imageSize: CGSize
 
-    /// Annotating the picture, or dressing it up (background, frame, shadow…). One document, two pages.
-    @Published var mode: Mode = .annotate {
-        didSet {
-            guard mode != oldValue else { return }
-            if mode == .beautify { cropRect = nil; selectedID = nil; if tool == .crop { tool = .select } }
-        }
+    /// Whether the picture is dressed up (background, frame, shadow…). The canvas then shows the finished result and annotations
+    /// are edited on it; off, it is the plain screenshot. Starts off for every screenshot.
+    @Published var beautifyOn = false {
+        didSet { if beautifyOn, tool == .crop { tool = .select } }
     }
-    /// The look used on the beautify page. Remembered across screenshots.
+    /// Whether the beautify popover is open.
+    @Published var showBeautifyPanel = false
+    /// The look used when beautify is on. Remembered across screenshots.
     @Published var style: BeautifyStyle { didSet { if style != oldValue { BeautifyStore.save(style) } } }
 
     @Published private(set) var history: EditHistory
@@ -111,25 +106,20 @@ final class EditorModel: ObservableObject {
     /// Pixels per point of the screenshot (2 on Retina); paddings and radii are in points.
     var pixelsPerPoint: Double { max(record.scale, 1) }
 
-    private var contentCache: (snapshot: EditSnapshot, image: CGImage)?
-    private var previewCache: (style: BeautifyStyle, snapshot: EditSnapshot, image: CGImage)?
-    private var thumbCache: [BeautifyPreset: (snapshot: EditSnapshot, background: String, image: NSImage)] = [:]
+    private var contentCache: (snapshot: EditSnapshot, image: CGImage, dark: Bool)?
 
     /// The annotated, cropped screenshot that goes onto the canvas.
     func annotatedContent() -> CGImage? {
         if let c = contentCache, c.snapshot == history.current { return c.image }
         guard let image = renderFinal() else { return nil }
-        contentCache = (history.current, image)
+        contentCache = (history.current, image, BeautifyRenderer.averageLuminance(of: image, topFraction: 0.12) < 0.5)
         return image
     }
 
-    /// A screen-sized render of the beautified picture, cached until the style or the annotations change.
-    func beautifyPreview() -> CGImage? {
-        if let c = previewCache, c.style == style, c.snapshot == history.current { return c.image }
-        guard let content = annotatedContent(),
-              let image = BeautifyRenderer.preview(content: content, style: style, pixelsPerPoint: pixelsPerPoint, maxSide: 1800) else { return nil }
-        previewCache = (style, history.current, image)
-        return image
+    /// Whether the window frame's title bar should be drawn dark (the screenshot's top edge is dark).
+    var contentIsDark: Bool {
+        _ = annotatedContent()
+        return contentCache?.dark ?? true
     }
 
     /// The finished beautified picture at full resolution.
@@ -138,24 +128,20 @@ final class EditorModel: ObservableObject {
         return BeautifyRenderer.render(content: content, style: style, pixelsPerPoint: pixelsPerPoint)
     }
 
-    /// What "完成" and "复制" produce: the page you are on.
-    func renderOutput() -> CGImage? { mode == .beautify ? renderBeautified() : renderFinal() }
+    /// What "完成" and "复制" produce: what the canvas shows.
+    func renderOutput() -> CGImage? { beautifyOn ? renderBeautified() : renderFinal() }
 
-    /// Small live preview of a preset applied to this screenshot.
-    func presetThumbnail(_ preset: BeautifyPreset) -> NSImage? {
-        if let c = thumbCache[preset], c.snapshot == history.current { return c.image }
-        guard let content = annotatedContent() else { return nil }
-        let f = min(1, 320 / Double(max(content.width, content.height)))
-        guard let small = BeautifyRenderer.scaled(content, by: f) else { return nil }
-        var s = preset.style(keeping: style)
-        s.ratio = .auto
-        guard let cg = BeautifyRenderer.preview(content: small, style: s, pixelsPerPoint: pixelsPerPoint * f, maxSide: 240) else { return nil }
-        let image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
-        thumbCache[preset] = (history.current, s.background, image)
-        return image
+    /// Whether the canvas shows the beautified frame right now (cropping always shows the bare picture).
+    var showsFrame: Bool { beautifyOn && tool != .crop }
+
+    /// Where everything sits on the beautified canvas, in pixels.
+    func frameLayout() -> BeautifyLayout {
+        BeautifyLayout.compute(content: visibleRect.size, style: style, pixelsPerPoint: pixelsPerPoint)
     }
 
     func applyPreset(_ preset: BeautifyPreset) { style = preset.style(keeping: style) }
+
+    func resetStyle() { style = BeautifyPreset.social.style(keeping: BeautifyStyle()) }
 
     // MARK: State
 
@@ -169,7 +155,7 @@ final class EditorModel: ObservableObject {
     var canRedo: Bool { history.canRedo }
     var selected: Annotation? { items.first { $0.id == selectedID } }
     /// Size of the exported picture.
-    var outputSize: CGSize { (crop ?? fullRect).integral.size }
+    var outputSize: CGSize { beautifyOn ? frameLayout().canvas : (crop ?? fullRect).integral.size }
 
     // MARK: Editing
 

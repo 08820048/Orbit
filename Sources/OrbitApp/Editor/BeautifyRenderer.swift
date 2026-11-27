@@ -14,6 +14,21 @@ enum BeautifyRenderer {
         ctx.interpolationQuality = .high
         ctx.translateBy(x: 0, y: CGFloat(h))
         ctx.scaleBy(x: 1, y: -1)                       // y-down, like the layout
+        draw(in: ctx, layout: layout, style: style, ppp: ppp, dark: averageLuminance(of: content, topFraction: 0.12) < 0.5, date: date) { ctx in
+            AnnotationRenderer.drawImage(content, in: layout.content, ctx)
+        }
+        return ctx.makeImage()
+    }
+
+    /// Draws background, shadow, window frame and signature around whatever `content` paints, in canvas pixels (y-down, origin at the
+    /// canvas's top-left). `content` runs with the window's rounded rectangle already clipped; it paints inside `layout.content`.
+    /// The export and the editor's live canvas both go through here, so what you edit is what you save.
+    static func draw(in ctx: CGContext, layout: BeautifyLayout, style: BeautifyStyle, ppp: Double, dark: Bool, date: Date = Date(),
+                     content: (CGContext) -> Void) {
+        // Everything stays inside the canvas: the export's bitmap does that by itself, the editor's view needs the clip.
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        ctx.clip(to: CGRect(origin: .zero, size: layout.canvas))
 
         let background = style.backgroundValue
         drawBackground(background, size: layout.canvas, ctx)
@@ -32,15 +47,16 @@ enum BeautifyRenderer {
 
         ctx.saveGState()
         ctx.addPath(path); ctx.clip()
-        let dark = averageLuminance(of: content, topFraction: 0.12) < 0.5
         if layout.chrome > 0 { drawChrome(style, layout: layout, dark: dark, ppp: ppp, ctx) }
-        AnnotationRenderer.drawImage(content, in: layout.content, ctx)
+        ctx.saveGState()
+        ctx.clip(to: layout.content)
+        content(ctx)
+        ctx.restoreGState()
         ctx.restoreGState()
 
         if style.showSignature || style.showWatermark {
             drawSignature(style, layout: layout, light: background.luminance > 0.6, ppp: ppp, date: date, ctx)
         }
-        return ctx.makeImage()
     }
 
     /// A smaller render for the live preview: the content is shrunk first, so dragging a slider stays smooth.

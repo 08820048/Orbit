@@ -210,7 +210,7 @@ final class CaptureCoordinator: ObservableObject {
 
     /// Opens the editor for a screenshot, on the annotate page or (`beautify`) the beautify page.
     func edit(_ record: ScreenshotRecord, beautify: Bool = false) {
-        EditorManager.shared.open(record, capture: self, mode: beautify ? .beautify : nil)
+        EditorManager.shared.open(record, capture: self, beautify: beautify)
     }
 
     /// The editor saved a picture: index it (a new file or the replaced original) and show the result like a fresh capture.

@@ -638,11 +638,12 @@ enum CaptureSelfTest {
         controller.model.tool = .text
         snap("editor-after-crop.png")
         controller.model.tool = .select
-        controller.model.mode = .beautify
+        controller.model.beautifyOn = true
         snap("editor-beautify.png")
         controller.model.applyPreset(.document)
         snap("editor-beautify-document.png")
         controller.model.applyPreset(.social)
+        snap("editor-beautify-social.png")
         // Save as a new screenshot and check the result like a user would.
         controller.saveAsNew()
         let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).filter { $0.hasSuffix(".png") && $0.hasPrefix("Orbit") }.sorted()

@@ -217,9 +217,6 @@
 "取消" = "Cancel";
 "保存图片失败：%@" = "Couldn't save the picture: %@";
 "没有读到可用的图片，请换一张（PNG / JPG / HEIC / SVG）。" = "Couldn't read a usable picture. Try another one (PNG / JPG / HEIC / SVG).";
-"在这一页点「完成」，保存的就是现在看到的样子" = "On this page, \"Done\" saves exactly what you see now";
-"一键预设" = "One-Click Presets";
-"窗口边框" = "Window Frame";
 "渐变" = "Gradient";
 "图片" = "Image";
 "自定义颜色" = "Custom color";
@@ -313,7 +310,6 @@
 "屏幕使用时间数据库结构和预期不一致：%@" = "The Screen Time database doesn't have the expected structure: %@";
 "区域" = "Region";
 "全屏" = "Full Screen";
-"%lld 张 · %@ · %@" = "%lld shots · %@ · %@";
 "延时" = "Delayed";
 "全部" = "All";
 "搜索文件名、应用" = "Search file names, apps";
@@ -438,3 +434,8 @@
 "取消截图" = "Cancel Screenshot";
 "点击选择要截取的显示器" = "Click the display to capture";
 "通用" = "General";
+"美化：背景、边距、圆角、阴影、外框" = "Beautify: background, padding, corners, shadow, frame";
+"%lld 张 · %@" = "%lld shots · %@";
+"外框" = "Frame";
+"署名与水印" = "Signature & watermark";
+"重置" = "Reset";

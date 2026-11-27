@@ -10,14 +10,9 @@ struct EditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            if model.mode == .annotate {
-                toolsRow
-                propertiesRow
-                EditorCanvas(model: model)
-                statusBar
-            } else {
-                BeautifyPage(model: model)
-            }
+            propertiesRow
+            EditorCanvas(model: model)
+            statusBar
         }
         .background(Theme.window)
         .foregroundStyle(Theme.text)
@@ -37,56 +32,55 @@ struct EditorView: View {
     // MARK: Title bar
 
     private var titleBar: some View {
-        HStack(spacing: 10) {
-            Spacer()
-            Button("取消") { controller.requestClose() }.glassButton()
-            Button("复制") { controller.copyToClipboard() }.glassButton()
-            SaveSplitButton(saveNew: { controller.saveAsNew() }, overwrite: { controller.overwriteOriginal() })
-        }
-        .padding(.horizontal, 20).frame(height: 52)
-        .overlay {
-            // Page switch in the middle; the file name sits beside the traffic lights.
-            GlassSegmented(options: EditorModel.Mode.allCases, label: \.rawValue, selection: $model.mode)
-        }
-        .overlay(alignment: .leading) {
+        HStack(spacing: 14) {
             HStack(spacing: 6) {
                 Text(model.record.url.deletingPathExtension().lastPathComponent).font(.system(size: 12)).foregroundStyle(Theme.text2).lineLimit(1)
                 if model.isDirty { Text("· 已编辑").font(.system(size: 12)).foregroundStyle(Theme.text2) }
             }
-            .padding(.leading, 84).frame(maxWidth: 300, alignment: .leading)
+            .frame(width: 150, alignment: .leading)
             .allowsHitTesting(false)
+            Spacer(minLength: 0)
+            toolbar
+            Spacer(minLength: 0)
+            Button("取消") { controller.requestClose() }.glassButton()
+            Button("复制") { controller.copyToClipboard() }.glassButton()
+            SaveSplitButton(saveNew: { controller.saveAsNew() }, overwrite: { controller.overwriteOriginal() })
         }
+        .padding(.leading, 84).padding(.trailing, 20).frame(height: 52)
     }
 
     // MARK: Tools
 
-    private var toolsRow: some View {
-        HStack(spacing: 22) {
-            HStack(spacing: 2) {
-                ForEach(EditorModel.Tool.allCases) { tool in
-                    let on = model.tool == tool
-                    toolGlyph(tool)
-                        .frame(width: 38, height: 30)
-                        .foregroundStyle(on ? Color.white : Theme.text2)
-                        .background {
-                            if on {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(LinearGradient(colors: [Color(hex: 0x5C9DFF), Color(hex: 0x3B82F6), Color(hex: 0x2D6CE3)], startPoint: .top, endPoint: .bottom))
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture { model.tool = tool }
-                        .help("\(tool.title)（\(tool.key.uppercased())）")
+    /// One pill: the drawing tools, undo and redo, and the beautify button.
+    private var toolbar: some View {
+        HStack(spacing: 1) {
+            ForEach(EditorModel.Tool.allCases) { tool in
+                let on = model.tool == tool
+                toolGlyph(tool)
+                    .frame(width: 34, height: 30)
+                    .foregroundStyle(on ? Theme.text : Theme.text2)
+                    .background { if on { RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.control) } }
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.tool = tool }
+                    .help("\(tool.title)（\(tool.key.uppercased())）")
+            }
+            Rectangle().fill(Theme.line).frame(width: 1, height: 18).padding(.horizontal, 6)
+            iconButton("arrow.uturn.backward", enabled: model.canUndo, help: String(localized: "撤销（⌘Z）")) { model.undo() }
+            iconButton("arrow.uturn.forward", enabled: model.canRedo, help: String(localized: "重做（⇧⌘Z）")) { model.redo() }
+            Rectangle().fill(Theme.line).frame(width: 1, height: 18).padding(.horizontal, 6)
+            Image(systemName: "paintpalette").font(.system(size: 14, weight: .medium))
+                .frame(width: 34, height: 30)
+                .foregroundStyle(model.beautifyOn ? Color.white : Theme.text2)
+                .background { if model.beautifyOn { RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.accent) } }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // First click turns beautify on and opens the panel; after that the button only opens and closes the panel.
+                    if !model.beautifyOn { model.beautifyOn = true; model.showBeautifyPanel = true } else { model.showBeautifyPanel.toggle() }
                 }
-            }
-            .padding(3).background(Theme.trough, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            HStack(spacing: 2) {
-                iconButton("arrow.uturn.backward", enabled: model.canUndo, help: String(localized: "撤销（⌘Z）")) { model.undo() }
-                iconButton("arrow.uturn.forward", enabled: model.canRedo, help: String(localized: "重做（⇧⌘Z）")) { model.redo() }
-            }
-            Spacer()
+                .help("美化：背景、边距、圆角、阴影、外框")
+                .popover(isPresented: $model.showBeautifyPanel, arrowEdge: .bottom) { BeautifyPanel(model: model) }
         }
-        .padding(.horizontal, 24).frame(height: 46)
+        .padding(3).background(Theme.control, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
     /// The text tool is a plain "T": the system's text symbol turns into the word "格式" on Chinese systems.
